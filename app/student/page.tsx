@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function StudentJoinPage() {
-  const params = useSearchParams();
+  
   const router = useRouter();
-  const [pin, setPin] = useState(params.get('pin') ?? '');
+  useEffect(() => {
+  const pinFromUrl = new URLSearchParams(window.location.search).get('pin');
+  if (pinFromUrl) setPin(pinFromUrl);
+}, []);
+  const [pin, setPin] = useState('');
   const [name, setName] = useState('');
   const [teamName, setTeamName] = useState('');
   const [color, setColor] = useState('');
