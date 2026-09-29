@@ -17,5 +17,5 @@ export function generatePin() {
 }
 
 export function generateToken() {
-  return crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
 }
