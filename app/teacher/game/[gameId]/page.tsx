@@ -36,7 +36,6 @@ export default function TeacherGamePage() {
   const [questionType, setQuestionType] = useState('multiple_choice');
   const [options, setOptions] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState('');
-  const [points, setPoints] = useState('100');
   const [money, setMoney] = useState('100');
 
   const load = async () => {
@@ -200,7 +199,6 @@ export default function TeacherGamePage() {
           questionType,
           options: optionList,
           correctAnswer,
-          points: Number(points) || moneyValue,
           money: moneyValue,
           questionOrder: questions.length,
         }),
@@ -215,7 +213,6 @@ export default function TeacherGamePage() {
         setQuestionType('multiple_choice');
         setOptions('');
         setCorrectAnswer('');
-        setPoints('100');
         setMoney('100');
         await load();
       }
@@ -745,7 +742,7 @@ export default function TeacherGamePage() {
             />
           </label>
 
-          <div className="grid gap-5 md:grid-cols-3">
+          <div className="grid gap-5 md:grid-cols-2">
             <label className="block text-sm font-bold">
               Question type
 
@@ -768,20 +765,6 @@ export default function TeacherGamePage() {
                   Short answer
                 </option>
               </select>
-            </label>
-
-            <label className="block text-sm font-bold">
-              Points
-
-              <input
-                type="number"
-                min="0"
-                value={points}
-                onChange={(event) =>
-                  setPoints(event.target.value)
-                }
-                className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 p-3"
-              />
             </label>
 
             <label className="block text-sm font-bold">
