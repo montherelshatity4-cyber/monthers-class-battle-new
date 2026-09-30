@@ -41,12 +41,22 @@ export async function POST(
     options,
     correctAnswer,
     points,
+    money,
     questionOrder,
   } = body;
 
   if (!questionText || !correctAnswer) {
     return NextResponse.json(
       { error: 'Question and correct answer are required.' },
+      { status: 400 }
+    );
+  }
+
+  const parsedMoney = Number(money ?? points ?? 100);
+
+  if (!Number.isFinite(parsedMoney) || parsedMoney < 0) {
+    return NextResponse.json(
+      { error: 'Money must be a valid positive number.' },
       { status: 400 }
     );
   }
@@ -59,7 +69,8 @@ export async function POST(
       question_type: questionType ?? 'multiple_choice',
       options: options ?? [],
       correct_answer: correctAnswer,
-      points: points ?? 100,
+      points: points ?? parsedMoney,
+      money: parsedMoney,
       question_order: questionOrder ?? 0,
     })
     .select()
