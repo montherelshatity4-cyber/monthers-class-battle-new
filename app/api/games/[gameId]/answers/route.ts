@@ -18,75 +18,134 @@ export async function POST(
 
     if (!questionId || !playerId || !answerText?.trim()) {
       return NextResponse.json(
-        { error: 'Question, player, and answer are required.' },
+        {
+          error: 'Question, player, and answer are required.',
+        },
         { status: 400 }
       );
     }
 
     const supabase = createSupabaseAdminClient();
 
-    const { data: player } = await supabase
+    // Make sure the player belongs to this game
+    // and get the team connected to this device.
+    const { data: player, error: playerError } = await supabase
       .from('players')
-      .select('id, game_id')
+      .select('id, game_id, team_id')
       .eq('id', playerId)
       .eq('game_id', gameId)
       .single();
 
-    if (!player) {
+    if (playerError || !player) {
       return NextResponse.json(
-        { error: 'Student not found in this game.' },
+        {
+          error: 'Student not found in this game.',
+        },
         { status: 404 }
       );
     }
 
-    const { data: question } = await supabase
+    // Make sure the question belongs to this game.
+    const { data: question, error: questionError } = await supabase
       .from('questions')
       .select('id, game_id')
       .eq('id', questionId)
       .eq('game_id', gameId)
       .single();
 
-    if (!question) {
+    if (questionError || !question) {
       return NextResponse.json(
-        { error: 'Question not found.' },
+        {
+          error: 'Question not found.',
+        },
         { status: 404 }
       );
     }
 
-    const { data: existingAnswer } = await supabase
-      .from('answers')
-      .select('id')
-      .eq('question_id', questionId)
-      .eq('player_id', playerId)
-      .maybeSingle();
+    // Make sure this is the question currently being played.
+    const { data: game, error: gameError } = await supabase
+      .from('games')
+      .select('id, status, current_question_id')
+      .eq('id', gameId)
+      .single();
 
-    if (existingAnswer) {
+    if (gameError || !game) {
       return NextResponse.json(
-        { error: 'You already answered this question.' },
+        {
+          error: 'Game not found.',
+        },
+        { status: 404 }
+      );
+    }
+
+    if (game.status !== 'active') {
+      return NextResponse.json(
+        {
+          error: 'The battle is not currently active.',
+        },
         { status: 409 }
       );
     }
 
-    const { data, error } = await supabase
-      .from('answers')
-      .insert({
-        game_id: gameId,
-        question_id: questionId,
-        player_id: playerId,
-        answer_text: answerText.trim(),
-        result: 'pending',
-      })
-      .select()
-      .single();
-
-    if (error) {
+    if (game.current_question_id !== questionId) {
       return NextResponse.json(
-        { error: error.message },
+        {
+          error: 'This is not the current question.',
+        },
+        { status: 409 }
+      );
+    }
+
+    // Atomic server-side first-tap claim.
+    //
+    // The PostgreSQL function uses the unique question_id constraint
+    // to guarantee that only ONE team can win the question.
+    const { data: claim, error: claimError } = await supabase.rpc(
+      'claim_question',
+      {
+        p_game_id: gameId,
+        p_question_id: questionId,
+        p_team_id: player.team_id,
+        p_player_id: player.id,
+        p_answer_text: answerText.trim(),
+      }
+    );
+
+    if (claimError) {
+      return NextResponse.json(
+        {
+          error: claimError.message,
+        },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ answer: data });
+    // If another team already claimed the question,
+    // PostgreSQL returns no new claim.
+    if (!claim) {
+      const { data: winner } = await supabase
+        .from('question_claims')
+        .select(
+          'id, game_id, question_id, team_id, player_id, answer_text, result, created_at'
+        )
+        .eq('question_id', questionId)
+        .maybeSingle();
+
+      return NextResponse.json(
+        {
+          accepted: false,
+          winner: winner ?? null,
+          message: 'Another team answered first.',
+        },
+        { status: 409 }
+      );
+    }
+
+    // This team won the race.
+    return NextResponse.json({
+      accepted: true,
+      claim,
+    });
   } catch (error) {
     return NextResponse.json(
       {
