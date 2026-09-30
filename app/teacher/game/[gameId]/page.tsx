@@ -313,216 +313,270 @@ export default function TeacherGamePage() {
 
   if (game?.status === 'active') {
     return (
-      <main className="mx-auto min-h-screen max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+      <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
         <header className="flex flex-wrap items-center justify-between gap-5">
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">
               Monther&apos;s Class Battle
             </p>
 
-            <h1 className="mt-2 text-4xl font-black">
-              Battle in progress
+            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
+              Battle in Progress
             </h1>
           </div>
 
-          <div className="rounded-2xl border border-cyan-400/40 bg-slate-900 px-6 py-4 text-center">
+          <div className="rounded-2xl border border-cyan-400/40 bg-slate-900 px-5 py-3 text-center">
             <p className="text-xs uppercase tracking-widest text-slate-400">
               Game PIN
             </p>
 
-            <p className="text-4xl font-black tracking-[0.25em] text-cyan-400">
+            <p className="text-3xl font-black tracking-[0.25em] text-cyan-400">
               {game.pin}
             </p>
           </div>
         </header>
 
         {error && (
-          <p className="mt-6 rounded-xl bg-red-500/20 p-4 font-bold text-red-200">
+          <p className="mt-5 rounded-xl bg-red-500/20 p-4 font-bold text-red-200">
             {error}
           </p>
         )}
 
         {currentQuestion ? (
-          <section className="mt-8 rounded-3xl border border-slate-700 bg-slate-900 p-6 sm:p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <span className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-black text-slate-950">
-                Question {currentQuestionNumber} / {totalQuestions}
-              </span>
-
-              <span className="rounded-full bg-slate-800 px-5 py-2 text-sm font-black">
-                Hidden Money: {currentQuestion.money}
-              </span>
-            </div>
-
-            <h2 className="mt-8 text-center text-3xl font-black leading-tight sm:text-5xl">
-              {currentQuestion.question_text}
-            </h2>
-
-            {currentQuestion.options?.length > 0 && (
-              <div className="mt-10 grid gap-4 md:grid-cols-2">
-                {currentQuestion.options.map((option, index) => (
-                  <div
-                    key={option}
-                    className="rounded-2xl border-2 border-slate-700 bg-slate-800 p-5 text-center text-xl font-bold"
-                  >
-                    <span className="mr-3 text-cyan-400">
-                      {String.fromCharCode(65 + index)}.
-                    </span>
-
-                    {option}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {!claim && (
-              <div className="mt-10 rounded-2xl border border-dashed border-slate-600 bg-slate-800/50 p-8 text-center">
-                <p className="text-2xl font-black text-amber-300">
-                  Waiting for the first team to answer...
-                </p>
-
-                <p className="mt-3 text-slate-400">
-                  All four teams are playing now.
-                </p>
-              </div>
-            )}
-
-            {claim && (
-              <div className="mt-10 rounded-3xl border-2 border-cyan-400/50 bg-cyan-400/10 p-7 text-center">
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-300">
-                  First Answer
-                </p>
-
-                <h3 className="mt-3 text-4xl font-black">
-                  {winningTeam?.custom_name ?? 'Unknown Team'}
-                </h3>
-
-                {winningPlayer && (
-                  <p className="mt-2 text-slate-400">
-                    Answered by {winningPlayer.display_name}
-                  </p>
-                )}
-
-                <div className="mt-6 rounded-2xl bg-slate-950/60 p-6">
-                  <p className="text-sm font-bold uppercase tracking-widest text-slate-400">
-                    Selected Answer
-                  </p>
-
-                  <p className="mt-3 text-3xl font-black text-white">
-                    {claim.answer_text}
-                  </p>
+          <>
+            {/* QUESTION AREA */}
+            <section className="mt-7 rounded-3xl border border-slate-700 bg-slate-900 p-5 sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-black text-slate-950 sm:text-base">
+                  Question {currentQuestionNumber} / {totalQuestions}
                 </div>
 
-                {claim.result === 'pending' && (
-                  <>
-                    <p className="mt-6 text-lg font-bold text-amber-300">
-                      Judge the answer
-                    </p>
-
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        disabled={judging}
-                        onClick={() => void judgeAnswer('correct')}
-                        className="min-h-20 rounded-2xl bg-emerald-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {judging ? 'Judging...' : '✓ Correct'}
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={judging}
-                        onClick={() => void judgeAnswer('wrong')}
-                        className="min-h-20 rounded-2xl bg-red-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {judging ? 'Judging...' : '✕ Wrong'}
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {claim.result === 'correct' && (
-                  <div className="mt-6">
-                    <p className="text-3xl font-black text-emerald-400">
-                      ✓ Correct!
-                    </p>
-
-                    <p className="mt-2 text-lg font-bold text-emerald-300">
-                      {currentQuestion.money} added to{' '}
-                      {winningTeam?.custom_name ?? 'the team'}.
-                    </p>
-                  </div>
-                )}
-
-                {claim.result === 'wrong' && (
-                  <div className="mt-6">
-                    <p className="text-3xl font-black text-red-400">
-                      ✕ Wrong!
-                    </p>
-
-                    <p className="mt-2 text-lg font-bold text-red-300">
-                      No money awarded.
-                    </p>
-                  </div>
-                )}
+                <div className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-5 py-2 text-sm font-black text-emerald-300 sm:text-base">
+                  Hidden Money: {currentQuestion.money}
+                </div>
               </div>
-            )}
 
-            {claim && claim.result !== 'pending' && (
-              <button
-                type="button"
-                disabled={movingNext}
-                onClick={() => void nextQuestion()}
-                className="mt-6 w-full rounded-2xl bg-cyan-400 px-6 py-5 text-xl font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {movingNext
-                  ? 'Loading next question...'
-                  : currentQuestionNumber >= totalQuestions
-                    ? 'Finish Battle'
-                    : 'Next Question →'}
-              </button>
-            )}
-          </section>
+              <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-center sm:p-10">
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">
+                  Question
+                </p>
+
+                <h2 className="mt-4 text-3xl font-black leading-tight sm:text-5xl">
+                  {currentQuestion.question_text}
+                </h2>
+              </div>
+
+              {currentQuestion.options?.length > 0 && (
+                <div className="mt-7 grid gap-4 md:grid-cols-2">
+                  {currentQuestion.options.map((option, index) => (
+                    <div
+                      key={option}
+                      className="flex min-h-20 items-center rounded-2xl border-2 border-slate-700 bg-slate-800 p-5 text-xl font-black sm:text-2xl"
+                    >
+                      <span className="mr-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-400 text-lg font-black text-slate-950">
+                        {String.fromCharCode(65 + index)}
+                      </span>
+
+                      <span>{option}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* WAITING FOR FIRST ANSWER */}
+              {!claim && (
+                <div className="mt-7 rounded-3xl border-2 border-dashed border-amber-400/40 bg-amber-400/5 p-7 text-center">
+                  <p className="text-2xl font-black text-amber-300 sm:text-3xl">
+                    Waiting for the first team to answer...
+                  </p>
+
+                  <p className="mt-3 text-slate-400">
+                    All teams can answer now.
+                  </p>
+                </div>
+              )}
+
+              {/* FIRST ANSWER */}
+              {claim && (
+                <div className="mt-7 rounded-3xl border-2 border-cyan-400/60 bg-cyan-400/10 p-6 text-center sm:p-8">
+                  <div className="inline-flex rounded-full bg-cyan-400 px-5 py-2 text-sm font-black uppercase tracking-widest text-slate-950">
+                    TEAM {winningTeam?.custom_name ?? 'UNKNOWN'} ANSWERED FIRST!
+                  </div>
+
+                  {winningPlayer && (
+                    <p className="mt-3 text-sm font-bold text-slate-400">
+                      Answered by {winningPlayer.display_name}
+                    </p>
+                  )}
+
+                  <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950 p-6">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">
+                      Selected Answer
+                    </p>
+
+                    <p className="mt-3 text-3xl font-black text-white sm:text-4xl">
+                      {claim.answer_text}
+                    </p>
+                  </div>
+
+                  {/* JUDGING */}
+                  {claim.result === 'pending' && (
+                    <>
+                      <p className="mt-7 text-xl font-black text-amber-300">
+                        Judge the answer
+                      </p>
+
+                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          disabled={judging}
+                          onClick={() => void judgeAnswer('correct')}
+                          className="min-h-20 rounded-2xl bg-emerald-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {judging ? 'Judging...' : '✓ Correct'}
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={judging}
+                          onClick={() => void judgeAnswer('wrong')}
+                          className="min-h-20 rounded-2xl bg-red-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {judging ? 'Judging...' : '✕ Wrong'}
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* CORRECT RESULT */}
+                  {claim.result === 'correct' && (
+                    <div className="mt-7 rounded-2xl border border-emerald-400/40 bg-emerald-400/10 p-6">
+                      <p className="text-4xl font-black text-emerald-400">
+                        ✓ CORRECT!
+                      </p>
+
+                      <p className="mt-3 text-xl font-black text-emerald-300">
+                        +{currentQuestion.money} Money
+                      </p>
+
+                      <p className="mt-1 text-slate-400">
+                        Added to{' '}
+                        {winningTeam?.custom_name ?? 'the team'}.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* WRONG RESULT */}
+                  {claim.result === 'wrong' && (
+                    <div className="mt-7 rounded-2xl border border-red-400/40 bg-red-400/10 p-6">
+                      <p className="text-4xl font-black text-red-400">
+                        ✕ WRONG!
+                      </p>
+
+                      <p className="mt-3 text-xl font-black text-red-300">
+                        -{currentQuestion.money} Money
+                      </p>
+
+                      <p className="mt-1 text-slate-400">
+                        Deducted from{' '}
+                        {winningTeam?.custom_name ?? 'the team'}.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* NEXT QUESTION */}
+              {claim && claim.result !== 'pending' && (
+                <button
+                  type="button"
+                  disabled={movingNext}
+                  onClick={() => void nextQuestion()}
+                  className="mt-6 w-full rounded-2xl bg-cyan-400 px-6 py-6 text-2xl font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {movingNext
+                    ? 'Loading next question...'
+                    : currentQuestionNumber >= totalQuestions
+                      ? 'Finish Battle'
+                      : 'Next Question →'}
+                </button>
+              )}
+            </section>
+
+            {/* TEAM SCOREBOARD */}
+            <section className="mt-7">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-cyan-400">
+                    Live Scoreboard
+                  </p>
+
+                  <h2 className="mt-1 text-2xl font-black sm:text-3xl">
+                    Team Money
+                  </h2>
+                </div>
+
+                <span className="rounded-full bg-slate-800 px-4 py-2 text-sm font-bold text-slate-400">
+                  {teams.length} / 4 Teams
+                </span>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {teams.map((team) => {
+                  const isWinningTeam =
+                    claim?.team_id === team.id;
+
+                  return (
+                    <div
+                      key={team.id}
+                      className={`rounded-2xl border-2 p-5 transition ${
+                        TEAM_COLOR_STYLES[team.color]
+                      } ${
+                        isWinningTeam
+                          ? 'ring-4 ring-cyan-400/70'
+                          : ''
+                      }`}
+                    >
+                      {isWinningTeam && (
+                        <p className="mb-2 text-xs font-black uppercase tracking-widest text-cyan-300">
+                          Answered First
+                        </p>
+                      )}
+
+                      <h3 className="text-xl font-black">
+                        {team.custom_name}
+                      </h3>
+
+                      <p
+                        className={`mt-3 text-4xl font-black ${
+                          team.score < 0
+                            ? 'text-red-400'
+                            : ''
+                        }`}
+                      >
+                        {team.score}
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold opacity-80">
+                        Money
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </>
         ) : (
           <section className="mt-8 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-12 text-center">
             <h2 className="text-3xl font-black">
               Preparing the question...
             </h2>
+
+            <p className="mt-4 text-lg text-slate-400">
+              Please wait.
+            </p>
           </section>
         )}
-
-        <section className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-2xl font-black">
-              Team Money
-            </h2>
-
-            <span className="text-sm font-bold text-slate-400">
-              Live scoreboard
-            </span>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {teams.map((team) => (
-              <div
-                key={team.id}
-                className={`rounded-2xl border-2 p-5 ${TEAM_COLOR_STYLES[team.color]}`}
-              >
-                <h3 className="text-xl font-black">
-                  {team.custom_name}
-                </h3>
-
-                <p className="mt-3 text-3xl font-black">
-                  {team.score}
-                </p>
-
-                <p className="mt-1 text-sm font-bold opacity-80">
-                  Money
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
       </main>
     );
   }
