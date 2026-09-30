@@ -105,8 +105,9 @@ export async function POST(
       );
     }
 
-    // Only a correct answer adds the hidden money to the team's total.
-    if (result === 'correct') {
+    // Correct = add money.
+    // Wrong = subtract money.
+    if (result === 'correct' || result === 'wrong') {
       const { data: team, error: teamError } = await supabase
         .from('teams')
         .select('id, score')
@@ -121,7 +122,10 @@ export async function POST(
         );
       }
 
-      const newScore = team.score + question.money;
+      const newScore =
+        result === 'correct'
+          ? team.score + question.money
+          : team.score - question.money;
 
       const { error: scoreError } = await supabase
         .from('teams')
@@ -141,7 +145,12 @@ export async function POST(
       ok: true,
       result,
       claim: updatedClaim,
-      moneyAwarded: result === 'correct' ? question.money : 0,
+      moneyAwarded:
+        result === 'correct'
+          ? question.money
+          : result === 'wrong'
+            ? -question.money
+            : 0,
     });
   } catch (error) {
     return NextResponse.json(
