@@ -30,12 +30,13 @@ export default function TeacherGamePage() {
 
     if (!response.ok) {
       setError(data.error);
-    } else {
-      setGame(data.game);
-      setTeams(data.teams ?? []);
-      setPlayers(data.players ?? []);
-      setQuestions(data.questions ?? []);
+      return;
     }
+
+    setGame(data.game);
+    setTeams(data.teams ?? []);
+    setPlayers(data.players ?? []);
+    setQuestions(data.questions ?? []);
   };
 
   useEffect(() => {
@@ -158,6 +159,136 @@ export default function TeacherGamePage() {
       ? `${window.location.origin}/student?pin=${game?.pin ?? ''}`
       : '';
 
+  const currentQuestion = questions[0];
+
+  if (game?.status === 'active') {
+    return (
+      <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">
+              Monther's Class Battle
+            </p>
+
+            <h1 className="mt-2 text-4xl font-black">
+              Battle in progress
+            </h1>
+          </div>
+
+          <div className="rounded-2xl border border-cyan-400/40 bg-slate-900 px-6 py-4 text-center">
+            <p className="text-xs uppercase tracking-widest text-slate-400">
+              Game PIN
+            </p>
+
+            <p className="text-4xl font-black tracking-[0.25em] text-cyan-400">
+              {game.pin}
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <p className="mt-6 rounded-xl bg-red-500/20 p-4 text-red-200">
+            {error}
+          </p>
+        )}
+
+        {currentQuestion ? (
+          <section className="mt-10 rounded-3xl border border-slate-700 bg-slate-900 p-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <span className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950">
+                Question 1
+              </span>
+
+              <span className="rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
+                {currentQuestion.points} points
+              </span>
+            </div>
+
+            <h2 className="mt-8 text-center text-4xl font-black leading-tight">
+              {currentQuestion.question_text}
+            </h2>
+
+            {currentQuestion.options?.length > 0 && (
+              <div className="mt-10 grid gap-4 md:grid-cols-2">
+                {currentQuestion.options.map((option, index) => (
+                  <div
+                    key={option}
+                    className="rounded-2xl border-2 border-slate-700 bg-slate-800 p-6 text-center text-xl font-bold"
+                  >
+                    <span className="mr-3 text-cyan-400">
+                      {String.fromCharCode(65 + index)}.
+                    </span>
+                    {option}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-10 rounded-2xl border border-slate-700 bg-slate-800 p-5 text-center">
+              <p className="text-sm font-bold uppercase tracking-widest text-slate-400">
+                Correct answer
+              </p>
+
+              <p className="mt-2 text-xl font-black text-emerald-300">
+                {currentQuestion.correct_answer}
+              </p>
+            </div>
+
+            <p className="mt-8 text-center text-slate-400">
+              Waiting for students to answer...
+            </p>
+          </section>
+        ) : (
+          <section className="mt-10 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-12 text-center">
+            <h2 className="text-3xl font-black">
+              Battle started!
+            </h2>
+
+            <p className="mt-4 text-lg text-slate-400">
+              You haven't added any questions yet.
+            </p>
+
+            <p className="mt-2 text-slate-500">
+              Go back to the lobby and add questions before starting the battle.
+            </p>
+          </section>
+        )}
+
+        <section className="mt-8">
+          <h2 className="mb-4 text-2xl font-black">
+            Teams
+          </h2>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {teams.map((team) => (
+              <div
+                key={team.id}
+                className={`rounded-2xl border-2 p-5 ${TEAM_COLOR_STYLES[team.color]}`}
+              >
+                <h3 className="text-xl font-black">
+                  {team.custom_name}
+                </h3>
+
+                <p className="mt-2 font-bold">
+                  Score: {team.score}
+                </p>
+
+                <p className="mt-1 text-sm">
+                  {
+                    players.filter(
+                      (player) => player.team_id === team.id
+                    ).length
+                  }{' '}
+                  players
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-6xl px-6 py-10">
       <div className="flex flex-wrap items-start justify-between gap-6">
@@ -167,9 +298,7 @@ export default function TeacherGamePage() {
           </p>
 
           <h1 className="mt-2 text-4xl font-black">
-            {game?.status === 'active'
-              ? 'Battle in progress'
-              : 'Waiting for teams'}
+            Waiting for teams
           </h1>
         </div>
 
@@ -243,7 +372,9 @@ export default function TeacherGamePage() {
         </section>
 
         <aside className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
-          <h2 className="font-bold">Join this battle</h2>
+          <h2 className="font-bold">
+            Join this battle
+          </h2>
 
           {joinUrl && (
             <div className="mt-4 rounded-xl bg-white p-3 text-center">
@@ -303,6 +434,7 @@ export default function TeacherGamePage() {
         >
           <label className="block text-sm font-bold">
             Question
+
             <textarea
               required
               value={questionText}
@@ -356,6 +488,7 @@ export default function TeacherGamePage() {
 
           <label className="block text-sm font-bold">
             Options
+
             <span className="ml-2 font-normal text-slate-400">
               (one option per line)
             </span>
@@ -397,47 +530,24 @@ export default function TeacherGamePage() {
 
         {questions.length > 0 && (
           <div className="mt-8 grid gap-4">
-            <h3 className="font-black">Your questions</h3>
+            <h3 className="font-black">
+              Your questions
+            </h3>
 
             {questions.map((question, index) => (
               <div
                 key={question.id}
                 className="rounded-2xl border border-slate-700 bg-slate-800 p-5"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
-                      Question {index + 1}
-                    </p>
+                <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
+                  Question {index + 1}
+                </p>
 
-                    <p className="mt-2 text-lg font-bold">
-                      {question.question_text}
-                    </p>
-                  </div>
+                <p className="mt-2 text-lg font-bold">
+                  {question.question_text}
+                </p>
 
-                  <span className="shrink-0 rounded-full bg-cyan-400 px-3 py-1 text-xs font-black text-slate-950">
-                    {question.points} pts
-                  </span>
-                </div>
-
-                {question.options?.length > 0 && (
-                  <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                    {question.options.map((option) => (
-                      <div
-                        key={option}
-                        className={`rounded-lg border p-3 ${
-                          option === question.correct_answer
-                            ? 'border-emerald-400 bg-emerald-400/10'
-                            : 'border-slate-600'
-                        }`}
-                      >
-                        {option}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <p className="mt-4 text-sm text-emerald-300">
+                <p className="mt-3 text-sm text-emerald-300">
                   Correct answer: {question.correct_answer}
                 </p>
               </div>
