@@ -313,31 +313,44 @@ export default function TeacherGamePage() {
 
   if (game?.status === 'active') {
     return (
-      <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-        <header className="flex flex-wrap items-center justify-between gap-5">
+      <main className="mx-auto min-h-screen max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8">
+        {/* TOP BAR */}
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700 pb-5">
           <div>
-            <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">
+            <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-400">
               Monther&apos;s Class Battle
             </p>
 
-            <h1 className="mt-2 text-3xl font-black sm:text-4xl">
-              Battle in Progress
+            <h1 className="mt-1 text-2xl font-black sm:text-3xl">
+              LIVE BATTLE
             </h1>
           </div>
 
-          <div className="rounded-2xl border border-cyan-400/40 bg-slate-900 px-5 py-3 text-center">
-            <p className="text-xs uppercase tracking-widest text-slate-400">
-              Game PIN
-            </p>
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl border border-cyan-400/40 bg-slate-900 px-5 py-3 text-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                Game PIN
+              </p>
 
-            <p className="text-3xl font-black tracking-[0.25em] text-cyan-400">
-              {game.pin}
-            </p>
+              <p className="text-2xl font-black tracking-[0.2em] text-cyan-400">
+                {game.pin}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-cyan-400 px-5 py-3 text-center text-slate-950">
+              <p className="text-[10px] font-black uppercase tracking-widest">
+                Question
+              </p>
+
+              <p className="text-2xl font-black">
+                {currentQuestionNumber} / {totalQuestions}
+              </p>
+            </div>
           </div>
         </header>
 
         {error && (
-          <p className="mt-5 rounded-xl bg-red-500/20 p-4 font-bold text-red-200">
+          <p className="mt-4 rounded-xl bg-red-500/20 p-4 text-center font-bold text-red-200">
             {error}
           </p>
         )}
@@ -345,144 +358,147 @@ export default function TeacherGamePage() {
         {currentQuestion ? (
           <>
             {/* QUESTION AREA */}
-            <section className="mt-7 rounded-3xl border border-slate-700 bg-slate-900 p-5 sm:p-8">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-black text-slate-950 sm:text-base">
-                  Question {currentQuestionNumber} / {totalQuestions}
-                </div>
-
-                <div className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-5 py-2 text-sm font-black text-emerald-300 sm:text-base">
+            <section className="mt-5 rounded-3xl border border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-7">
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <div className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-6 py-2 text-sm font-black uppercase tracking-widest text-emerald-300">
                   Hidden Money: {currentQuestion.money}
                 </div>
               </div>
 
-              <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-center sm:p-10">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">
-                  Question
+              {/* BIG QUESTION */}
+              <div className="mt-5 rounded-3xl bg-slate-950 px-5 py-8 text-center sm:px-10 sm:py-10">
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-600">
+                  Question {currentQuestionNumber}
                 </p>
 
-                <h2 className="mt-4 text-3xl font-black leading-tight sm:text-5xl">
+                <h2 className="mt-4 text-3xl font-black leading-tight sm:text-5xl lg:text-6xl">
                   {currentQuestion.question_text}
                 </h2>
               </div>
 
+              {/* ANSWER OPTIONS */}
               {currentQuestion.options?.length > 0 && (
-                <div className="mt-7 grid gap-4 md:grid-cols-2">
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
                   {currentQuestion.options.map((option, index) => (
                     <div
                       key={option}
-                      className="flex min-h-20 items-center rounded-2xl border-2 border-slate-700 bg-slate-800 p-5 text-xl font-black sm:text-2xl"
+                      className="flex min-h-24 items-center rounded-2xl border-2 border-slate-700 bg-slate-800 px-5 py-4 sm:min-h-28 sm:px-7"
                     >
-                      <span className="mr-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-cyan-400 text-lg font-black text-slate-950">
+                      <span className="mr-5 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-cyan-400 text-xl font-black text-slate-950">
                         {String.fromCharCode(65 + index)}
                       </span>
 
-                      <span>{option}</span>
+                      <span className="text-xl font-black sm:text-2xl">
+                        {option}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
 
-              {/* WAITING FOR FIRST ANSWER */}
+              {/* WAITING */}
               {!claim && (
-                <div className="mt-7 rounded-3xl border-2 border-dashed border-amber-400/40 bg-amber-400/5 p-7 text-center">
-                  <p className="text-2xl font-black text-amber-300 sm:text-3xl">
-                    Waiting for the first team to answer...
+                <div className="mt-5 rounded-2xl border-2 border-dashed border-amber-400/40 bg-amber-400/5 px-5 py-6 text-center">
+                  <p className="text-xl font-black uppercase text-amber-300 sm:text-2xl">
+                    WAITING FOR THE FIRST TEAM TO ANSWER...
                   </p>
 
-                  <p className="mt-3 text-slate-400">
-                    All teams can answer now.
+                  <p className="mt-2 text-sm text-slate-500">
+                    All four teams can answer now.
                   </p>
                 </div>
               )}
 
               {/* FIRST ANSWER */}
               {claim && (
-                <div className="mt-7 rounded-3xl border-2 border-cyan-400/60 bg-cyan-400/10 p-6 text-center sm:p-8">
-                  <div className="inline-flex rounded-full bg-cyan-400 px-5 py-2 text-sm font-black uppercase tracking-widest text-slate-950">
-                    TEAM {winningTeam?.custom_name ?? 'UNKNOWN'} ANSWERED FIRST!
+                <div className="mt-5 overflow-hidden rounded-3xl border-2 border-cyan-400/60 bg-cyan-400/10">
+                  <div className="bg-cyan-400 px-5 py-4 text-center text-slate-950">
+                    <p className="text-xl font-black uppercase tracking-widest sm:text-3xl">
+                      🚨 TEAM {winningTeam?.custom_name ?? 'UNKNOWN'} ANSWERED FIRST! 🚨
+                    </p>
                   </div>
 
-                  {winningPlayer && (
-                    <p className="mt-3 text-sm font-bold text-slate-400">
-                      Answered by {winningPlayer.display_name}
-                    </p>
-                  )}
+                  <div className="p-5 text-center sm:p-7">
+                    {winningPlayer && (
+                      <p className="text-sm font-bold text-slate-400">
+                        Answered by {winningPlayer.display_name}
+                      </p>
+                    )}
 
-                  <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950 p-6">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">
+                    <p className="mt-5 text-xs font-black uppercase tracking-[0.25em] text-slate-500">
                       Selected Answer
                     </p>
 
-                    <p className="mt-3 text-3xl font-black text-white sm:text-4xl">
-                      {claim.answer_text}
-                    </p>
-                  </div>
-
-                  {/* JUDGING */}
-                  {claim.result === 'pending' && (
-                    <>
-                      <p className="mt-7 text-xl font-black text-amber-300">
-                        Judge the answer
+                    <div className="mt-3 rounded-2xl bg-slate-950 px-5 py-6">
+                      <p className="text-3xl font-black sm:text-4xl">
+                        {claim.answer_text}
                       </p>
+                    </div>
 
-                      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                        <button
-                          type="button"
-                          disabled={judging}
-                          onClick={() => void judgeAnswer('correct')}
-                          className="min-h-20 rounded-2xl bg-emerald-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {judging ? 'Judging...' : '✓ Correct'}
-                        </button>
+                    {/* JUDGE */}
+                    {claim.result === 'pending' && (
+                      <>
+                        <p className="mt-5 text-lg font-black uppercase text-amber-300">
+                          Teacher: Judge the answer
+                        </p>
 
-                        <button
-                          type="button"
-                          disabled={judging}
-                          onClick={() => void judgeAnswer('wrong')}
-                          className="min-h-20 rounded-2xl bg-red-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {judging ? 'Judging...' : '✕ Wrong'}
-                        </button>
+                        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            disabled={judging}
+                            onClick={() => void judgeAnswer('correct')}
+                            className="min-h-24 rounded-2xl bg-emerald-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50 sm:text-3xl"
+                          >
+                            {judging ? 'JUDGING...' : '✓ CORRECT'}
+                          </button>
+
+                          <button
+                            type="button"
+                            disabled={judging}
+                            onClick={() => void judgeAnswer('wrong')}
+                            className="min-h-24 rounded-2xl bg-red-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50 sm:text-3xl"
+                          >
+                            {judging ? 'JUDGING...' : '✕ WRONG'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+
+                    {/* CORRECT RESULT */}
+                    {claim.result === 'correct' && (
+                      <div className="mt-5 rounded-2xl border-2 border-emerald-400/50 bg-emerald-400/10 p-5">
+                        <p className="text-4xl font-black text-emerald-400 sm:text-5xl">
+                          ✓ CORRECT!
+                        </p>
+
+                        <p className="mt-2 text-xl font-black text-emerald-300">
+                          +{currentQuestion.money} MONEY
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-400">
+                          Added to {winningTeam?.custom_name ?? 'the team'}.
+                        </p>
                       </div>
-                    </>
-                  )}
+                    )}
 
-                  {/* CORRECT RESULT */}
-                  {claim.result === 'correct' && (
-                    <div className="mt-7 rounded-2xl border border-emerald-400/40 bg-emerald-400/10 p-6">
-                      <p className="text-4xl font-black text-emerald-400">
-                        ✓ CORRECT!
-                      </p>
+                    {/* WRONG RESULT */}
+                    {claim.result === 'wrong' && (
+                      <div className="mt-5 rounded-2xl border-2 border-red-400/50 bg-red-400/10 p-5">
+                        <p className="text-4xl font-black text-red-400 sm:text-5xl">
+                          ✕ WRONG!
+                        </p>
 
-                      <p className="mt-3 text-xl font-black text-emerald-300">
-                        +{currentQuestion.money} Money
-                      </p>
+                        <p className="mt-2 text-xl font-black text-red-300">
+                          -{currentQuestion.money} MONEY
+                        </p>
 
-                      <p className="mt-1 text-slate-400">
-                        Added to{' '}
-                        {winningTeam?.custom_name ?? 'the team'}.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* WRONG RESULT */}
-                  {claim.result === 'wrong' && (
-                    <div className="mt-7 rounded-2xl border border-red-400/40 bg-red-400/10 p-6">
-                      <p className="text-4xl font-black text-red-400">
-                        ✕ WRONG!
-                      </p>
-
-                      <p className="mt-3 text-xl font-black text-red-300">
-                        -{currentQuestion.money} Money
-                      </p>
-
-                      <p className="mt-1 text-slate-400">
-                        Deducted from{' '}
-                        {winningTeam?.custom_name ?? 'the team'}.
-                      </p>
-                    </div>
-                  )}
+                        <p className="mt-1 text-sm text-slate-400">
+                          Deducted from{' '}
+                          {winningTeam?.custom_name ?? 'the team'}.
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -492,20 +508,20 @@ export default function TeacherGamePage() {
                   type="button"
                   disabled={movingNext}
                   onClick={() => void nextQuestion()}
-                  className="mt-6 w-full rounded-2xl bg-cyan-400 px-6 py-6 text-2xl font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="mt-5 w-full rounded-2xl bg-cyan-400 px-6 py-6 text-2xl font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50 sm:text-3xl"
                 >
                   {movingNext
-                    ? 'Loading next question...'
+                    ? 'LOADING...'
                     : currentQuestionNumber >= totalQuestions
-                      ? 'Finish Battle'
-                      : 'Next Question →'}
+                      ? 'FINISH BATTLE'
+                      : 'NEXT QUESTION →'}
                 </button>
               )}
             </section>
 
             {/* TEAM SCOREBOARD */}
-            <section className="mt-7">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <section className="mt-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-black uppercase tracking-widest text-cyan-400">
                     Live Scoreboard
@@ -521,15 +537,14 @@ export default function TeacherGamePage() {
                 </span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {teams.map((team) => {
-                  const isWinningTeam =
-                    claim?.team_id === team.id;
+                  const isWinningTeam = claim?.team_id === team.id;
 
                   return (
                     <div
                       key={team.id}
-                      className={`rounded-2xl border-2 p-5 transition ${
+                      className={`rounded-2xl border-2 p-4 transition sm:p-5 ${
                         TEAM_COLOR_STYLES[team.color]
                       } ${
                         isWinningTeam
@@ -538,26 +553,24 @@ export default function TeacherGamePage() {
                       }`}
                     >
                       {isWinningTeam && (
-                        <p className="mb-2 text-xs font-black uppercase tracking-widest text-cyan-300">
+                        <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-cyan-300">
                           Answered First
                         </p>
                       )}
 
-                      <h3 className="text-xl font-black">
+                      <h3 className="truncate text-lg font-black sm:text-xl">
                         {team.custom_name}
                       </h3>
 
                       <p
-                        className={`mt-3 text-4xl font-black ${
-                          team.score < 0
-                            ? 'text-red-400'
-                            : ''
+                        className={`mt-2 text-3xl font-black sm:text-4xl ${
+                          team.score < 0 ? 'text-red-400' : ''
                         }`}
                       >
                         {team.score}
                       </p>
 
-                      <p className="mt-1 text-sm font-bold opacity-80">
+                      <p className="text-xs font-bold uppercase tracking-wider opacity-70">
                         Money
                       </p>
                     </div>
@@ -850,7 +863,10 @@ export default function TeacherGamePage() {
               onChange={(event) =>
                 setOptions(event.target.value)
               }
-              placeholder={`A\nB\nC\nD`}
+              placeholder={`A
+B
+C
+D`}
               className="mt-2 min-h-32 w-full rounded-xl border border-slate-600 bg-slate-800 p-3"
             />
           </label>
