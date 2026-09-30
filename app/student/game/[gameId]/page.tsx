@@ -7,6 +7,13 @@ import type { Game, Question } from '@/types';
 
 type Feedback = 'correct' | 'wrong' | null;
 
+type Team = {
+  id: string;
+  custom_name: string;
+  color: string;
+  score: number;
+};
+
 type Claim = {
   id: string;
   game_id: string;
@@ -24,14 +31,7 @@ export default function StudentGamePage() {
 
   const [game, setGame] = useState<Game | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [teams, setTeams] = useState<
-    {
-      id: string;
-      custom_name: string;
-      color: string;
-      score: number;
-    }[]
-  >([]);
+  const [teams, setTeams] = useState<Team[]>([]);
 
   const [claim, setClaim] = useState<Claim | null>(null);
   const [connected, setConnected] = useState(false);
@@ -51,36 +51,26 @@ export default function StudentGamePage() {
     setPlayerId(storedPlayerId);
   }, [gameId]);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const response = await fetch(`/api/games/${gameId}`);
-        const data = await response.json();
+  const load = async () => {
+    try {
+      const response = await fetch(`/api/games/${gameId}`);
+      const data = await response.json();
 
-        if (!response.ok) {
-          setError(data.error ?? 'Unable to load the game.');
-          return;
-        }
-
-        setGame(data.game);
-        setQuestions(data.questions ?? []);
-        setTeams(data.teams ?? []);
-
-        if (data.game?.current_question_id) {
-          const claimResponse = await fetch(
-            `/api/games/${gameId}/claims?questionId=${data.game.current_question_id}`
-          );
-
-          if (claimResponse.ok) {
-            const claimData = await claimResponse.json();
-            setClaim(claimData.claim ?? null);
-          }
-        }
-      } catch {
-        setError('Unable to connect to the game.');
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to load the game.');
+        return;
       }
-    };
 
+      setGame(data.game);
+      setQuestions(data.questions ?? []);
+      setTeams(data.teams ?? []);
+      setClaim(data.currentClaim ?? null);
+    } catch {
+      setError('Unable to connect to the game.');
+    }
+  };
+
+  useEffect(() => {
     void load();
 
     const supabase = createSupabaseBrowserClient();
@@ -88,7 +78,7 @@ export default function StudentGamePage() {
     const channel = supabase
       .channel(`student-battle-${gameId}`)
 
-      // Game changes: start / next question
+      // Game changes: start / next question / finish
       .on(
         'postgres_changes',
         {
@@ -107,7 +97,7 @@ export default function StudentGamePage() {
         }
       )
 
-      // A new question is created
+      // New question created
       .on(
         'postgres_changes',
         {
@@ -162,6 +152,8 @@ export default function StudentGamePage() {
             setFeedback('wrong');
             playWrongSound();
           }
+
+          void load();
         }
       )
 
@@ -337,6 +329,10 @@ export default function StudentGamePage() {
 
   const isWinner = !!claim && claim.team_id === teamId;
 
+  const currentQuestionNumber = currentQuestion
+    ? currentQuestion.question_order + 1
+    : 0;
+
   if (error && !game) {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 text-center">
@@ -346,8 +342,7 @@ export default function StudentGamePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col px-5 py-8 sm:px-8 sm:py-10">
-      {/* Header */}
+    <main className="mx-auto flex min-h-screen max-w-5xl flex-col px-5 py-8 sm:px-8 sm:py-10">
       <header className="text-center">
         <p className="text-sm font-black uppercase tracking-[0.25em] text-cyan-400">
           Monther&apos;s Class Battle
@@ -372,10 +367,11 @@ export default function StudentGamePage() {
         </div>
       </header>
 
-      {/* Waiting for teacher */}
-      {game?.status !== 'active' && (
+      {game?.status === 'lobby' && (
         <section className="mt-10 rounded-3xl border border-slate-700 bg-slate-900 p-8 text-center sm:p-12">
-          <h2 className="text-3xl font-black">You&apos;re in!</h2>
+          <h2 className="text-3xl font-black">
+            You&apos;re in!
+          </h2>
 
           <p className="mt-4 text-lg text-slate-400">
             Wait for your teacher to start the battle.
@@ -391,24 +387,95 @@ export default function StudentGamePage() {
         </section>
       )}
 
-      {/* Battle */}
+      {game?.status === 'finished' && (
+        <section className="mt-10 rounded-3xl border border-slate-700 bg-slate-900 p-8 sm:p-10">
+          <div className="text-center">
+            <h2 className="text-4xl font-black">
+              Battle Finished!
+            </h2>
+
+            <p className="mt-3 text-slate-400">
+              Final Team Money
+            </p>
+          </div>
+
+          <div className="mt-8 grid gap-4">
+            {[...teams]
+              .sort((a, b) => b.score - a.score)
+              .map((team, index) => (
+                <div
+                  key={team.id}
+                  className="flex items-center justify-between rounded-2xl border border-slate-700 bg-slate-800 p-5"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-2xl font-black">
+                      #{index + 1}
+                    </span>
+
+                    <div>
+                      <h3 className="text-xl font-black">
+                        {team.custom_name}
+                      </h3>
+
+                      <p className="text-sm text-slate-400">
+                        {team.color}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-3xl font-black text-emerald-300">
+                      {team.score}
+                    </p>
+
+                    <p className="text-xs font-bold text-slate-400">
+                      Money
+                    </p>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
+
       {game?.status === 'active' && (
         <>
-          {/* Question counter */}
-          <div className="mt-8 flex items-center justify-between">
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
             <span className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950">
-              Question{' '}
-              {currentQuestion
-                ? currentQuestion.question_order + 1
-                : '-'}
+              Question {currentQuestionNumber} / {questions.length}
             </span>
 
             {myTeam && (
               <span className="rounded-full bg-slate-800 px-4 py-2 text-sm font-black">
-                Money: ${myTeam.score}
+                My Team Money: {myTeam.score}
               </span>
             )}
           </div>
+
+          <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {teams.map((team) => (
+              <div
+                key={team.id}
+                className={`rounded-2xl border border-slate-700 bg-slate-900 p-4 ${
+                  team.id === teamId
+                    ? 'border-cyan-400/70'
+                    : ''
+                }`}
+              >
+                <p className="truncate text-sm font-black">
+                  {team.custom_name}
+                </p>
+
+                <p className="mt-1 text-xl font-black text-emerald-300">
+                  {team.score}
+                </p>
+
+                <p className="text-xs font-bold text-slate-500">
+                  Money
+                </p>
+              </div>
+            ))}
+          </section>
 
           {currentQuestion ? (
             <section className="mt-6 rounded-3xl border border-slate-700 bg-slate-900 p-6 sm:p-10">
@@ -416,9 +483,8 @@ export default function StudentGamePage() {
                 {currentQuestion.question_text}
               </h2>
 
-              {/* Someone already answered */}
               {claim ? (
-                <div className="mt-10 rounded-3xl border border-cyan-400/40 bg-cyan-400/10 p-7 text-center">
+                <div className="mt-10 rounded-3xl border-2 border-cyan-400/40 bg-cyan-400/10 p-7 text-center">
                   <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
                     {isWinner
                       ? 'You answered first!'
@@ -431,30 +497,24 @@ export default function StudentGamePage() {
                     </h3>
                   )}
 
-                  <p className="mt-3 text-lg text-slate-300">
+                  <p className="mt-4 text-lg text-slate-300">
                     Answer: <strong>{claim.answer_text}</strong>
                   </p>
 
                   {claim.result === 'pending' && (
-                    <p className="mt-5 font-bold text-amber-300">
+                    <p className="mt-6 text-lg font-black text-amber-300">
                       Waiting for the teacher to judge the answer...
                     </p>
                   )}
 
-                  {claim.result === 'correct' && isWinner && (
-                    <p className="mt-5 text-xl font-black text-emerald-400">
-                      Correct! You won the money!
-                    </p>
-                  )}
-
-                  {claim.result === 'correct' && !isWinner && (
-                    <p className="mt-5 text-xl font-black text-slate-300">
-                      The teacher marked the answer correct.
+                  {claim.result === 'correct' && (
+                    <p className="mt-6 text-2xl font-black text-emerald-400">
+                      Correct!
                     </p>
                   )}
 
                   {claim.result === 'wrong' && (
-                    <p className="mt-5 text-xl font-black text-red-400">
+                    <p className="mt-6 text-2xl font-black text-red-400">
                       Wrong answer.
                     </p>
                   )}
@@ -497,7 +557,11 @@ export default function StudentGamePage() {
 
                       <button
                         type="button"
-                        disabled={!selectedAnswer.trim() || sending || !!claim}
+                        disabled={
+                          !selectedAnswer.trim() ||
+                          sending ||
+                          !!claim
+                        }
                         onClick={() =>
                           void answerQuestion(selectedAnswer)
                         }
@@ -512,7 +576,9 @@ export default function StudentGamePage() {
             </section>
           ) : (
             <section className="mt-8 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-10 text-center">
-              <h2 className="text-3xl font-black">Get Ready!</h2>
+              <h2 className="text-3xl font-black">
+                Get Ready!
+              </h2>
 
               <p className="mt-4 text-lg text-slate-400">
                 Your teacher is preparing the next question.
@@ -522,17 +588,15 @@ export default function StudentGamePage() {
         </>
       )}
 
-      {/* Error */}
       {error && game && (
         <p className="mt-5 text-center text-sm font-bold text-red-300">
           {error}
         </p>
       )}
 
-      {/* Feedback overlay */}
       {feedback && (
         <div
-          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/70"
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/75"
           aria-live="assertive"
         >
           <div
