@@ -39,9 +39,9 @@ export default function StudentGamePage() {
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [sending, setSending] = useState(false);
-const audioContextRef = useRef<AudioContext | null>(null);
-const correctSoundRef = useRef<(() => void) | null>(null);
-const wrongSoundRef = useRef<(() => void) | null>(null);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+
   const [teamId, setTeamId] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
 
@@ -72,117 +72,9 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
     }
   };
 
-  useEffect(() => {
-    void load();
+  const prepareAudio = () => {
+    if (typeof window === 'undefined') return;
 
-    const supabase = createSupabaseBrowserClient();
-
-    const channel = supabase
-      .channel(`student-battle-${gameId}`)
-
-      // Game changes: start / next question / finish
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'games',
-          filter: `id=eq.${gameId}`,
-        },
-        () => {
-          setSelectedAnswer('');
-          setClaim(null);
-          setFeedback(null);
-          setSending(false);
-
-          void load();
-        }
-      )
-
-      // New question created
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'questions',
-          filter: `game_id=eq.${gameId}`,
-        },
-        () => {
-          void load();
-        }
-      )
-
-      // Someone answered first
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'question_claims',
-          filter: `game_id=eq.${gameId}`,
-        },
-        (payload) => {
-          const newClaim = payload.new as Claim;
-
-          setClaim(newClaim);
-          setSelectedAnswer(newClaim.answer_text);
-          setSending(false);
-        }
-      )
-
-      // Teacher judged the answer
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'question_claims',
-          filter: `game_id=eq.${gameId}`,
-        },
-        (payload) => {
-          const updatedClaim = payload.new as Claim;
-
-          setClaim(updatedClaim);
-
-          if (updatedClaim.result === 'correct') {
-            setFeedback('correct');
-            playCorrectSound();
-          }
-
-          if (updatedClaim.result === 'wrong') {
-            setFeedback('wrong');
-            playWrongSound();
-          }
-
-          void load();
-        }
-      )
-
-      // Team money changes
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'teams',
-          filter: `game_id=eq.${gameId}`,
-        },
-        () => {
-          void load();
-        }
-      )
-
-      .subscribe((status) => {
-        setConnected(status === 'SUBSCRIBED');
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [gameId]);
-
-  const playCorrectSound = () => {
     const AudioContextClass =
       window.AudioContext ||
       (
@@ -193,7 +85,26 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
 
     if (!AudioContextClass) return;
 
-    const audio = new AudioContextClass();
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextClass();
+    }
+
+    const audio = audioContextRef.current;
+
+    if (audio.state === 'suspended') {
+      void audio.resume();
+    }
+  };
+
+  const playCorrectSound = () => {
+    const audio = audioContextRef.current;
+
+    if (!audio) return;
+
+    if (audio.state === 'suspended') {
+      void audio.resume();
+    }
+
     const now = audio.currentTime;
 
     const oscillator1 = audio.createOscillator();
@@ -227,24 +138,17 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
 
     oscillator1.stop(now + 1.5);
     oscillator2.stop(now + 1.5);
-
-    window.setTimeout(() => {
-      void audio.close();
-    }, 1700);
   };
 
   const playWrongSound = () => {
-    const AudioContextClass =
-      window.AudioContext ||
-      (
-        window as typeof window & {
-          webkitAudioContext?: typeof AudioContext;
-        }
-      ).webkitAudioContext;
+    const audio = audioContextRef.current;
 
-    if (!AudioContextClass) return;
+    if (!audio) return;
 
-    const audio = new AudioContextClass();
+    if (audio.state === 'suspended') {
+      void audio.resume();
+    }
+
     const now = audio.currentTime;
 
     const oscillator = audio.createOscillator();
@@ -264,11 +168,117 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
 
     oscillator.start(now);
     oscillator.stop(now + 1.5);
-
-    window.setTimeout(() => {
-      void audio.close();
-    }, 1700);
   };
+
+  useEffect(() => {
+    void load();
+
+    const supabase = createSupabaseBrowserClient();
+
+    const channel = supabase
+      .channel(`student-battle-${gameId}`)
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'games',
+          filter: `id=eq.${gameId}`,
+        },
+        () => {
+          setSelectedAnswer('');
+          setClaim(null);
+          setFeedback(null);
+          setSending(false);
+
+          void load();
+        }
+      )
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'questions',
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => {
+          void load();
+        }
+      )
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'question_claims',
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          const newClaim = payload.new as Claim;
+
+          setClaim(newClaim);
+          setSelectedAnswer(newClaim.answer_text);
+          setSending(false);
+        }
+      )
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'question_claims',
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          const updatedClaim = payload.new as Claim;
+
+          setClaim(updatedClaim);
+
+          if (updatedClaim.result === 'correct') {
+            setFeedback('correct');
+            playCorrectSound();
+          }
+
+          if (updatedClaim.result === 'wrong') {
+            setFeedback('wrong');
+            playWrongSound();
+          }
+
+          void load();
+        }
+      )
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'teams',
+          filter: `game_id=eq.${gameId}`,
+        },
+        () => {
+          void load();
+        }
+      )
+
+      .subscribe((status) => {
+        setConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+
+      if (audioContextRef.current) {
+        void audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+    };
+  }, [gameId]);
 
   const answerQuestion = async (answer: string) => {
     if (!currentQuestion || !answer.trim() || sending || claim) {
@@ -279,6 +289,9 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
       setError('Team session not found. Please join the game again.');
       return;
     }
+
+    // Activate the audio system directly from the team's tap.
+    prepareAudio();
 
     setSelectedAnswer(answer);
     setSending(true);
@@ -426,7 +439,13 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
                   </div>
 
                   <div className="text-right">
-                    <p className="text-3xl font-black text-emerald-300">
+                    <p
+                      className={`text-3xl font-black ${
+                        team.score < 0
+                          ? 'text-red-400'
+                          : 'text-emerald-300'
+                      }`}
+                    >
                       {team.score}
                     </p>
 
@@ -468,7 +487,13 @@ const wrongSoundRef = useRef<(() => void) | null>(null);
                   {team.custom_name}
                 </p>
 
-                <p className="mt-1 text-xl font-black text-emerald-300">
+                <p
+                  className={`mt-1 text-xl font-black ${
+                    team.score < 0
+                      ? 'text-red-400'
+                      : 'text-emerald-300'
+                  }`}
+                >
                   {team.score}
                 </p>
 
