@@ -290,7 +290,6 @@ export default function StudentGamePage() {
       return;
     }
 
-    // Activate the audio system directly from the team's tap.
     prepareAudio();
 
     setSelectedAnswer(answer);
@@ -344,10 +343,6 @@ export default function StudentGamePage() {
 
   const isWinner = !!claim && claim.team_id === teamId;
 
-  const currentQuestionNumber = currentQuestion
-    ? currentQuestion.question_order + 1
-    : 0;
-
   if (error && !game) {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 text-center">
@@ -357,16 +352,32 @@ export default function StudentGamePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-5xl flex-col px-5 py-8 sm:px-8 sm:py-10">
+    <main className="mx-auto flex min-h-screen max-w-2xl flex-col px-5 py-8 sm:px-8 sm:py-10">
       <header className="text-center">
         <p className="text-sm font-black uppercase tracking-[0.25em] text-cyan-400">
           Monther&apos;s Class Battle
         </p>
 
         {myTeam && (
-          <h1 className="mt-3 text-3xl font-black sm:text-4xl">
-            {myTeam.custom_name}
-          </h1>
+          <>
+            <h1 className="mt-4 text-4xl font-black sm:text-5xl">
+              {myTeam.custom_name}
+            </h1>
+
+            <p
+              className={`mt-3 text-3xl font-black ${
+                myTeam.score < 0
+                  ? 'text-red-400'
+                  : 'text-emerald-300'
+              }`}
+            >
+              {myTeam.score}
+            </p>
+
+            <p className="text-sm font-bold text-slate-500">
+              Money
+            </p>
+          </>
         )}
 
         <div className="mt-4 flex items-center justify-center gap-3">
@@ -403,115 +414,35 @@ export default function StudentGamePage() {
       )}
 
       {game?.status === 'finished' && (
-        <section className="mt-10 rounded-3xl border border-slate-700 bg-slate-900 p-8 sm:p-10">
-          <div className="text-center">
-            <h2 className="text-4xl font-black">
-              Battle Finished!
-            </h2>
+        <section className="mt-10 rounded-3xl border border-slate-700 bg-slate-900 p-8 text-center sm:p-10">
+          <h2 className="text-4xl font-black">
+            Battle Finished!
+          </h2>
 
-            <p className="mt-3 text-slate-400">
-              Final Team Money
+          <p className="mt-4 text-lg text-slate-400">
+            Your Final Money
+          </p>
+
+          {myTeam && (
+            <p
+              className={`mt-4 text-6xl font-black ${
+                myTeam.score < 0
+                  ? 'text-red-400'
+                  : 'text-emerald-300'
+              }`}
+            >
+              {myTeam.score}
             </p>
-          </div>
-
-          <div className="mt-8 grid gap-4">
-            {[...teams]
-              .sort((a, b) => b.score - a.score)
-              .map((team, index) => (
-                <div
-                  key={team.id}
-                  className="flex items-center justify-between rounded-2xl border border-slate-700 bg-slate-800 p-5"
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-2xl font-black">
-                      #{index + 1}
-                    </span>
-
-                    <div>
-                      <h3 className="text-xl font-black">
-                        {team.custom_name}
-                      </h3>
-
-                      <p className="text-sm text-slate-400">
-                        {team.color}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <p
-                      className={`text-3xl font-black ${
-                        team.score < 0
-                          ? 'text-red-400'
-                          : 'text-emerald-300'
-                      }`}
-                    >
-                      {team.score}
-                    </p>
-
-                    <p className="text-xs font-bold text-slate-400">
-                      Money
-                    </p>
-                  </div>
-                </div>
-              ))}
-          </div>
+          )}
         </section>
       )}
 
       {game?.status === 'active' && (
         <>
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-3">
-            <span className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950">
-              Question {currentQuestionNumber} / {questions.length}
-            </span>
-
-            {myTeam && (
-              <span className="rounded-full bg-slate-800 px-4 py-2 text-sm font-black">
-                My Team Money: {myTeam.score}
-              </span>
-            )}
-          </div>
-
-          <section className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {teams.map((team) => (
-              <div
-                key={team.id}
-                className={`rounded-2xl border border-slate-700 bg-slate-900 p-4 ${
-                  team.id === teamId
-                    ? 'border-cyan-400/70'
-                    : ''
-                }`}
-              >
-                <p className="truncate text-sm font-black">
-                  {team.custom_name}
-                </p>
-
-                <p
-                  className={`mt-1 text-xl font-black ${
-                    team.score < 0
-                      ? 'text-red-400'
-                      : 'text-emerald-300'
-                  }`}
-                >
-                  {team.score}
-                </p>
-
-                <p className="text-xs font-bold text-slate-500">
-                  Money
-                </p>
-              </div>
-            ))}
-          </section>
-
           {currentQuestion ? (
-            <section className="mt-6 rounded-3xl border border-slate-700 bg-slate-900 p-6 sm:p-10">
-              <h2 className="text-center text-3xl font-black leading-tight sm:text-5xl">
-                {currentQuestion.question_text}
-              </h2>
-
+            <section className="mt-10">
               {claim ? (
-                <div className="mt-10 rounded-3xl border-2 border-cyan-400/40 bg-cyan-400/10 p-7 text-center">
+                <div className="rounded-3xl border-2 border-cyan-400/40 bg-cyan-400/10 p-8 text-center">
                   <p className="text-sm font-black uppercase tracking-widest text-cyan-400">
                     {isWinner
                       ? 'You answered first!'
@@ -519,18 +450,29 @@ export default function StudentGamePage() {
                   </p>
 
                   {winningTeam && (
-                    <h3 className="mt-3 text-3xl font-black">
-                      {winningTeam.custom_name}
-                    </h3>
+                    <h2 className="mt-4 text-3xl font-black">
+                      {isWinner
+                        ? 'LOCKED IN'
+                        : `${winningTeam.custom_name} answered first`}
+                    </h2>
                   )}
 
-                  <p className="mt-4 text-lg text-slate-300">
-                    Answer: <strong>{claim.answer_text}</strong>
-                  </p>
+                  {isWinner && (
+                    <p className="mt-4 text-lg text-slate-300">
+                      Your answer:{' '}
+                      <strong>{claim.answer_text}</strong>
+                    </p>
+                  )}
+
+                  {!isWinner && (
+                    <p className="mt-5 text-2xl font-black text-amber-300">
+                      TOO LATE
+                    </p>
+                  )}
 
                   {claim.result === 'pending' && (
                     <p className="mt-6 text-lg font-black text-amber-300">
-                      Waiting for the teacher to judge the answer...
+                      Waiting for the teacher...
                     </p>
                   )}
 
@@ -547,22 +489,22 @@ export default function StudentGamePage() {
                   )}
                 </div>
               ) : (
-                <>
-                  <p className="mt-5 text-center font-bold text-amber-300">
+                <div>
+                  <p className="mb-6 text-center text-lg font-black text-amber-300">
                     Be the first team to answer!
                   </p>
 
                   {currentQuestion.options?.length > 0 ? (
-                    <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-5">
                       {currentQuestion.options.map((option, index) => (
                         <button
                           key={option}
                           type="button"
                           disabled={sending || !!claim}
                           onClick={() => void answerQuestion(option)}
-                          className="min-h-20 rounded-2xl border-2 border-slate-700 bg-slate-800 p-5 text-left text-xl font-black transition hover:border-cyan-400 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="min-h-24 rounded-3xl border-2 border-slate-700 bg-slate-900 p-6 text-left text-2xl font-black transition active:scale-[0.98] hover:border-cyan-400 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          <span className="mr-3 text-cyan-400">
+                          <span className="mr-4 text-cyan-400">
                             {String.fromCharCode(65 + index)}.
                           </span>
 
@@ -571,7 +513,7 @@ export default function StudentGamePage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="mt-8">
+                    <div>
                       <input
                         value={selectedAnswer}
                         disabled={sending || !!claim}
@@ -579,7 +521,7 @@ export default function StudentGamePage() {
                           setSelectedAnswer(event.target.value)
                         }
                         placeholder="Type your answer..."
-                        className="w-full rounded-2xl border border-slate-600 bg-slate-800 p-5 text-lg outline-none focus:border-cyan-400"
+                        className="w-full rounded-3xl border border-slate-600 bg-slate-900 p-6 text-xl outline-none focus:border-cyan-400"
                       />
 
                       <button
@@ -592,23 +534,23 @@ export default function StudentGamePage() {
                         onClick={() =>
                           void answerQuestion(selectedAnswer)
                         }
-                        className="mt-4 w-full rounded-2xl bg-cyan-400 px-5 py-5 text-lg font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="mt-5 w-full rounded-3xl bg-cyan-400 px-5 py-6 text-xl font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         {sending ? 'Sending...' : 'Answer Now'}
                       </button>
                     </div>
                   )}
-                </>
+                </div>
               )}
             </section>
           ) : (
-            <section className="mt-8 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-10 text-center">
+            <section className="mt-10 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-10 text-center">
               <h2 className="text-3xl font-black">
                 Get Ready!
               </h2>
 
               <p className="mt-4 text-lg text-slate-400">
-                Your teacher is preparing the next question.
+                Waiting for the next question...
               </p>
             </section>
           )}
