@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Game, Question } from '@/types';
@@ -17,8 +17,7 @@ export default function StudentGamePage() {
   const [error, setError] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState<Feedback>(null);
-
-  const answeredRef = useRef(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -49,8 +48,7 @@ export default function StudentGamePage() {
           filter: `id=eq.${gameId}`,
         },
         (payload) => {
-          const next = payload.new as Game;
-          setGame(next);
+          setGame(payload.new as Game);
           void load();
         }
       )
@@ -63,6 +61,31 @@ export default function StudentGamePage() {
           filter: `game_id=eq.${gameId}`,
         },
         () => void load()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'answers',
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          const answer = payload.new as {
+            id: string;
+            result: string;
+          };
+
+          if (answer.result === 'correct') {
+            setFeedback('correct');
+            playCorrectSound();
+          }
+
+          if (answer.result === 'wrong') {
+            setFeedback('wrong');
+            playWrongSound();
+          }
+        }
       )
       .subscribe((status) => {
         setConnected(status === 'SUBSCRIBED');
@@ -95,14 +118,16 @@ export default function StudentGamePage() {
     oscillator2.type = 'triangle';
 
     oscillator1.frequency.setValueAtTime(523.25, now);
-    oscillator1.frequency.setValueAtTime(659.25, now + 0.12);
+    oscillator1.frequency.setValueAtTime(659.25, now + 0.25);
+    oscillator1.frequency.setValueAtTime(783.99, now + 0.5);
 
     oscillator2.frequency.setValueAtTime(659.25, now);
-    oscillator2.frequency.setValueAtTime(783.99, now + 0.12);
+    oscillator2.frequency.setValueAtTime(783.99, now + 0.25);
+    oscillator2.frequency.setValueAtTime(1046.5, now + 0.5);
 
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
 
     oscillator1.connect(gain);
     oscillator2.connect(gain);
@@ -111,12 +136,12 @@ export default function StudentGamePage() {
     oscillator1.start(now);
     oscillator2.start(now);
 
-    oscillator1.stop(now + 0.45);
-    oscillator2.stop(now + 0.45);
+    oscillator1.stop(now + 0.9);
+    oscillator2.stop(now + 0.9);
 
     window.setTimeout(() => {
       void audio.close();
-    }, 600);
+    }, 1100);
   };
 
   const playWrongSound = () => {
@@ -137,40 +162,57 @@ export default function StudentGamePage() {
     const gain = audio.createGain();
 
     oscillator.type = 'sawtooth';
-    oscillator.frequency.setValueAtTime(180, now);
-    oscillator.frequency.exponentialRampToValueAtTime(70, now + 0.45);
+    oscillator.frequency.setValueAtTime(220, now);
+    oscillator.frequency.exponentialRampToValueAtTime(70, now + 0.8);
 
     gain.gain.setValueAtTime(0.35, now);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
 
     oscillator.connect(gain);
     gain.connect(audio.destination);
 
     oscillator.start(now);
-    oscillator.stop(now + 0.5);
+    oscillator.stop(now + 0.85);
 
     window.setTimeout(() => {
       void audio.close();
-    }, 650);
+    }, 1050);
   };
 
-  const answerQuestion = (answer: string) => {
-    if (!currentQuestion || answeredRef.current) return;
+  const answerQuestion = async (answer: string) => {
+    if (!currentQuestion || !answer.trim() || sending) return;
 
-    answeredRef.current = true;
-    setSelectedAnswer(answer);
+    const playerId = localStorage.getItem(`player_${gameId}`);
 
-    const isCorrect =
-      answer.trim().toLowerCase() ===
-      currentQuestion.correct_answer.trim().toLowerCase();
-
-    if (isCorrect) {
-      setFeedback('correct');
-      playCorrectSound();
-    } else {
-      setFeedback('wrong');
-      playWrongSound();
+    if (!playerId) {
+      setError('Student session not found. Please join the game again.');
+      return;
     }
+
+    setSelectedAnswer(answer);
+    setSending(true);
+
+    const response = await fetch(`/api/games/${gameId}/answers`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        questionId: currentQuestion.id,
+        playerId,
+        answerText: answer,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setError(data.error ?? 'Unable to send answer.');
+      setSending(false);
+      return;
+    }
+
+    setSending(false);
   };
 
   if (error) {
@@ -190,7 +232,6 @@ export default function StudentGamePage() {
           className={`mx-auto mb-4 h-4 w-4 rounded-full ${
             connected ? 'bg-emerald-400' : 'bg-amber-400'
           }`}
-          title={connected ? 'Connected' : 'Reconnecting'}
         />
 
         <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">
@@ -221,21 +262,9 @@ export default function StudentGamePage() {
                   <button
                     key={option}
                     type="button"
-                    disabled={answeredRef.current}
-                    onClick={() => answerQuestion(option)}
-                    className={`rounded-2xl border-2 p-5 text-left text-lg font-bold transition ${
-                      selectedAnswer === option
-                        ? feedback === 'correct'
-                          ? 'border-emerald-400 bg-emerald-400/20'
-                          : feedback === 'wrong'
-                            ? 'border-red-400 bg-red-400/20'
-                            : 'border-cyan-400 bg-cyan-400/20'
-                        : 'border-slate-700 bg-slate-800'
-                    } ${
-                      answeredRef.current
-                        ? 'cursor-not-allowed opacity-80'
-                        : 'hover:border-cyan-400'
-                    }`}
+                    disabled={sending || !!selectedAnswer}
+                    onClick={() => void answerQuestion(option)}
+                    className="rounded-2xl border-2 border-slate-700 bg-slate-800 p-5 text-left text-lg font-bold transition hover:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     <span className="mr-3 text-cyan-400">
                       {String.fromCharCode(65 + index)}.
@@ -249,35 +278,28 @@ export default function StudentGamePage() {
               <div className="mt-8">
                 <input
                   value={selectedAnswer}
-                  disabled={answeredRef.current}
+                  disabled={sending}
                   onChange={(event) =>
                     setSelectedAnswer(event.target.value)
                   }
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      answerQuestion(selectedAnswer);
-                    }
-                  }}
                   placeholder="Type your answer..."
                   className="w-full rounded-xl border border-slate-600 bg-slate-800 p-4 text-lg"
                 />
 
                 <button
                   type="button"
-                  disabled={!selectedAnswer || answeredRef.current}
-                  onClick={() => answerQuestion(selectedAnswer)}
+                  disabled={!selectedAnswer.trim() || sending}
+                  onClick={() => void answerQuestion(selectedAnswer)}
                   className="mt-4 w-full rounded-xl bg-cyan-400 px-5 py-4 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Check Answer
+                  {sending ? 'Sending...' : 'Send Answer'}
                 </button>
               </div>
             )}
           </section>
         ) : (
           <section className="mt-8 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-10 text-center">
-            <h1 className="text-3xl font-black">
-              Battle started!
-            </h1>
+            <h1 className="text-3xl font-black">Battle started!</h1>
 
             <p className="mt-4 text-lg text-slate-400">
               Your teacher is getting the questions ready...
@@ -286,9 +308,7 @@ export default function StudentGamePage() {
         )
       ) : (
         <section className="mt-8 rounded-3xl border border-slate-700 bg-slate-900 p-8 text-center">
-          <h1 className="text-4xl font-black">
-            You're in!
-          </h1>
+          <h1 className="text-4xl font-black">You're in!</h1>
 
           <p className="mt-4 text-xl text-slate-300">
             Wait for your teacher to start the battle.
