@@ -399,9 +399,7 @@ export default function TeacherGamePage() {
           </button>
 
           <p className="mt-3 text-center text-xs text-slate-400">
-            {game?.status === 'active'
-              ? 'Battle started'
-              : 'You need at least one team.'}
+            You need at least one team.
           </p>
         </aside>
       </div>
