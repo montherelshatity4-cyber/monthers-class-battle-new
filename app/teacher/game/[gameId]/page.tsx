@@ -6,6 +6,17 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Game, Player, Team, Question } from '@/types';
 import { TEAM_COLOR_STYLES } from '@/lib/game/team-colors';
 
+type Claim = {
+  id: string;
+  game_id: string;
+  question_id: string;
+  team_id: string;
+  player_id: string;
+  answer_text: string;
+  result: 'pending' | 'correct' | 'wrong';
+  created_at: string;
+};
+
 export default function TeacherGamePage() {
   const { gameId } = useParams<{ gameId: string }>();
 
@@ -13,30 +24,39 @@ export default function TeacherGamePage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [claim, setClaim] = useState<Claim | null>(null);
 
   const [error, setError] = useState('');
   const [starting, setStarting] = useState(false);
   const [addingQuestion, setAddingQuestion] = useState(false);
+  const [judging, setJudging] = useState(false);
+  const [movingNext, setMovingNext] = useState(false);
 
   const [questionText, setQuestionText] = useState('');
   const [questionType, setQuestionType] = useState('multiple_choice');
   const [options, setOptions] = useState('');
   const [correctAnswer, setCorrectAnswer] = useState('');
   const [points, setPoints] = useState('100');
+  const [money, setMoney] = useState('100');
 
   const load = async () => {
-    const response = await fetch(`/api/games/${gameId}`);
-    const data = await response.json();
+    try {
+      const response = await fetch(`/api/games/${gameId}`);
+      const data = await response.json();
 
-    if (!response.ok) {
-      setError(data.error);
-      return;
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to load the game.');
+        return;
+      }
+
+      setGame(data.game);
+      setTeams(data.teams ?? []);
+      setPlayers(data.players ?? []);
+      setQuestions(data.questions ?? []);
+      setClaim(data.currentClaim ?? null);
+    } catch {
+      setError('Unable to connect to the game.');
     }
-
-    setGame(data.game);
-    setTeams(data.teams ?? []);
-    setPlayers(data.players ?? []);
-    setQuestions(data.questions ?? []);
   };
 
   useEffect(() => {
@@ -45,7 +65,8 @@ export default function TeacherGamePage() {
     const supabase = createSupabaseBrowserClient();
 
     const channel = supabase
-      .channel(`game-${gameId}`)
+      .channel(`teacher-battle-${gameId}`)
+
       .on(
         'postgres_changes',
         {
@@ -56,6 +77,7 @@ export default function TeacherGamePage() {
         },
         () => void load()
       )
+
       .on(
         'postgres_changes',
         {
@@ -66,6 +88,7 @@ export default function TeacherGamePage() {
         },
         () => void load()
       )
+
       .on(
         'postgres_changes',
         {
@@ -74,8 +97,11 @@ export default function TeacherGamePage() {
           table: 'games',
           filter: `id=eq.${gameId}`,
         },
-        () => void load()
+        () => {
+          void load();
+        }
       )
+
       .on(
         'postgres_changes',
         {
@@ -86,6 +112,34 @@ export default function TeacherGamePage() {
         },
         () => void load()
       )
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'question_claims',
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          setClaim(payload.new as Claim);
+        }
+      )
+
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'question_claims',
+          filter: `game_id=eq.${gameId}`,
+        },
+        (payload) => {
+          setClaim(payload.new as Claim);
+          void load();
+        }
+      )
+
       .subscribe();
 
     return () => {
@@ -97,19 +151,23 @@ export default function TeacherGamePage() {
     setStarting(true);
     setError('');
 
-    const response = await fetch(`/api/games/${gameId}/start`, {
-      method: 'POST',
-    });
+    try {
+      const response = await fetch(`/api/games/${gameId}/start`, {
+        method: 'POST',
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      setError(data.error);
-    } else {
-      await load();
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to start the battle.');
+      } else {
+        await load();
+      }
+    } catch {
+      setError('Unable to start the battle.');
+    } finally {
+      setStarting(false);
     }
-
-    setStarting(false);
   };
 
   const addQuestion = async (event: React.FormEvent) => {
@@ -123,35 +181,114 @@ export default function TeacherGamePage() {
       .map((option) => option.trim())
       .filter(Boolean);
 
-    const response = await fetch(`/api/games/${gameId}/questions`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        questionText,
-        questionType,
-        options: optionList,
-        correctAnswer,
-        points: Number(points) || 100,
-        questionOrder: questions.length,
-      }),
-    });
+    const moneyValue = Number(money);
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      setError(data.error);
-    } else {
-      setQuestionText('');
-      setQuestionType('multiple_choice');
-      setOptions('');
-      setCorrectAnswer('');
-      setPoints('100');
-      await load();
+    if (!Number.isFinite(moneyValue) || moneyValue < 0) {
+      setError('Money must be a valid number.');
+      setAddingQuestion(false);
+      return;
     }
 
-    setAddingQuestion(false);
+    try {
+      const response = await fetch(`/api/games/${gameId}/questions`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          questionText,
+          questionType,
+          options: optionList,
+          correctAnswer,
+          points: Number(points) || moneyValue,
+          money: moneyValue,
+          questionOrder: questions.length,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to add question.');
+      } else {
+        setQuestionText('');
+        setQuestionType('multiple_choice');
+        setOptions('');
+        setCorrectAnswer('');
+        setPoints('100');
+        setMoney('100');
+        await load();
+      }
+    } catch {
+      setError('Unable to add question.');
+    } finally {
+      setAddingQuestion(false);
+    }
+  };
+
+  const judgeAnswer = async (result: 'correct' | 'wrong') => {
+    if (!claim || claim.result !== 'pending' || judging) {
+      return;
+    }
+
+    setJudging(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/games/${gameId}/judge`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          questionId: claim.question_id,
+          result,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to judge the answer.');
+        return;
+      }
+
+      setClaim(data.claim);
+      await load();
+    } catch {
+      setError('Unable to judge the answer.');
+    } finally {
+      setJudging(false);
+    }
+  };
+
+  const nextQuestion = async () => {
+    if (movingNext) {
+      return;
+    }
+
+    setMovingNext(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/games/${gameId}/next`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to move to the next question.');
+        return;
+      }
+
+      setClaim(null);
+      await load();
+    } catch {
+      setError('Unable to move to the next question.');
+    } finally {
+      setMovingNext(false);
+    }
   };
 
   const joinUrl =
@@ -159,15 +296,31 @@ export default function TeacherGamePage() {
       ? `${window.location.origin}/student?pin=${game?.pin ?? ''}`
       : '';
 
-  const currentQuestion = questions[0];
+  const currentQuestion = questions.find(
+    (question) => question.id === game?.current_question_id
+  );
+
+  const currentQuestionNumber = currentQuestion
+    ? currentQuestion.question_order + 1
+    : 0;
+
+  const totalQuestions = questions.length;
+
+  const winningTeam = claim
+    ? teams.find((team) => team.id === claim.team_id)
+    : null;
+
+  const winningPlayer = claim
+    ? players.find((player) => player.id === claim.player_id)
+    : null;
 
   if (game?.status === 'active') {
     return (
-      <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      <main className="mx-auto min-h-screen max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+        <header className="flex flex-wrap items-center justify-between gap-5">
           <div>
             <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">
-              Monther's Class Battle
+              Monther&apos;s Class Battle
             </p>
 
             <h1 className="mt-2 text-4xl font-black">
@@ -184,27 +337,27 @@ export default function TeacherGamePage() {
               {game.pin}
             </p>
           </div>
-        </div>
+        </header>
 
         {error && (
-          <p className="mt-6 rounded-xl bg-red-500/20 p-4 text-red-200">
+          <p className="mt-6 rounded-xl bg-red-500/20 p-4 font-bold text-red-200">
             {error}
           </p>
         )}
 
         {currentQuestion ? (
-          <section className="mt-10 rounded-3xl border border-slate-700 bg-slate-900 p-8">
+          <section className="mt-8 rounded-3xl border border-slate-700 bg-slate-900 p-6 sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <span className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-black text-slate-950">
-                Question 1
+              <span className="rounded-full bg-cyan-400 px-5 py-2 text-sm font-black text-slate-950">
+                Question {currentQuestionNumber} / {totalQuestions}
               </span>
 
-              <span className="rounded-full bg-slate-800 px-4 py-2 text-sm font-bold">
-                {currentQuestion.points} points
+              <span className="rounded-full bg-slate-800 px-5 py-2 text-sm font-black">
+                Hidden Money: {currentQuestion.money}
               </span>
             </div>
 
-            <h2 className="mt-8 text-center text-4xl font-black leading-tight">
+            <h2 className="mt-8 text-center text-3xl font-black leading-tight sm:text-5xl">
               {currentQuestion.question_text}
             </h2>
 
@@ -213,51 +366,144 @@ export default function TeacherGamePage() {
                 {currentQuestion.options.map((option, index) => (
                   <div
                     key={option}
-                    className="rounded-2xl border-2 border-slate-700 bg-slate-800 p-6 text-center text-xl font-bold"
+                    className="rounded-2xl border-2 border-slate-700 bg-slate-800 p-5 text-center text-xl font-bold"
                   >
                     <span className="mr-3 text-cyan-400">
                       {String.fromCharCode(65 + index)}.
                     </span>
+
                     {option}
                   </div>
                 ))}
               </div>
             )}
 
-            <div className="mt-10 rounded-2xl border border-slate-700 bg-slate-800 p-5 text-center">
-              <p className="text-sm font-bold uppercase tracking-widest text-slate-400">
-                Correct answer
-              </p>
+            {!claim && (
+              <div className="mt-10 rounded-2xl border border-dashed border-slate-600 bg-slate-800/50 p-8 text-center">
+                <p className="text-2xl font-black text-amber-300">
+                  Waiting for the first team to answer...
+                </p>
 
-              <p className="mt-2 text-xl font-black text-emerald-300">
-                {currentQuestion.correct_answer}
-              </p>
-            </div>
+                <p className="mt-3 text-slate-400">
+                  All four teams are playing now.
+                </p>
+              </div>
+            )}
 
-            <p className="mt-8 text-center text-slate-400">
-              Waiting for students to answer...
-            </p>
+            {claim && (
+              <div className="mt-10 rounded-3xl border-2 border-cyan-400/50 bg-cyan-400/10 p-7 text-center">
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-cyan-300">
+                  First Answer
+                </p>
+
+                <h3 className="mt-3 text-4xl font-black">
+                  {winningTeam?.custom_name ?? 'Unknown Team'}
+                </h3>
+
+                {winningPlayer && (
+                  <p className="mt-2 text-slate-400">
+                    Answered by {winningPlayer.display_name}
+                  </p>
+                )}
+
+                <div className="mt-6 rounded-2xl bg-slate-950/60 p-6">
+                  <p className="text-sm font-bold uppercase tracking-widest text-slate-400">
+                    Selected Answer
+                  </p>
+
+                  <p className="mt-3 text-3xl font-black text-white">
+                    {claim.answer_text}
+                  </p>
+                </div>
+
+                {claim.result === 'pending' && (
+                  <>
+                    <p className="mt-6 text-lg font-bold text-amber-300">
+                      Judge the answer
+                    </p>
+
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={judging}
+                        onClick={() => void judgeAnswer('correct')}
+                        className="min-h-20 rounded-2xl bg-emerald-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {judging ? 'Judging...' : '✓ Correct'}
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={judging}
+                        onClick={() => void judgeAnswer('wrong')}
+                        className="min-h-20 rounded-2xl bg-red-500 px-6 py-5 text-2xl font-black text-white transition hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {judging ? 'Judging...' : '✕ Wrong'}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {claim.result === 'correct' && (
+                  <div className="mt-6">
+                    <p className="text-3xl font-black text-emerald-400">
+                      ✓ Correct!
+                    </p>
+
+                    <p className="mt-2 text-lg font-bold text-emerald-300">
+                      {currentQuestion.money} added to{' '}
+                      {winningTeam?.custom_name ?? 'the team'}.
+                    </p>
+                  </div>
+                )}
+
+                {claim.result === 'wrong' && (
+                  <div className="mt-6">
+                    <p className="text-3xl font-black text-red-400">
+                      ✕ Wrong!
+                    </p>
+
+                    <p className="mt-2 text-lg font-bold text-red-300">
+                      No money awarded.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {claim && claim.result !== 'pending' && (
+              <button
+                type="button"
+                disabled={movingNext}
+                onClick={() => void nextQuestion()}
+                className="mt-6 w-full rounded-2xl bg-cyan-400 px-6 py-5 text-xl font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {movingNext
+                  ? 'Loading next question...'
+                  : currentQuestionNumber >= totalQuestions
+                    ? 'Finish Battle'
+                    : 'Next Question →'}
+              </button>
+            )}
           </section>
         ) : (
-          <section className="mt-10 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-12 text-center">
+          <section className="mt-8 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-12 text-center">
             <h2 className="text-3xl font-black">
-              Battle started!
+              Preparing the question...
             </h2>
-
-            <p className="mt-4 text-lg text-slate-400">
-              You haven't added any questions yet.
-            </p>
-
-            <p className="mt-2 text-slate-500">
-              Go back to the lobby and add questions before starting the battle.
-            </p>
           </section>
         )}
 
         <section className="mt-8">
-          <h2 className="mb-4 text-2xl font-black">
-            Teams
-          </h2>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-black">
+              Team Money
+            </h2>
+
+            <span className="text-sm font-bold text-slate-400">
+              Live scoreboard
+            </span>
+          </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {teams.map((team) => (
@@ -269,21 +515,75 @@ export default function TeacherGamePage() {
                   {team.custom_name}
                 </h3>
 
-                <p className="mt-2 font-bold">
-                  Score: {team.score}
+                <p className="mt-3 text-3xl font-black">
+                  {team.score}
                 </p>
 
-                <p className="mt-1 text-sm">
-                  {
-                    players.filter(
-                      (player) => player.team_id === team.id
-                    ).length
-                  }{' '}
-                  players
+                <p className="mt-1 text-sm font-bold opacity-80">
+                  Money
                 </p>
               </div>
             ))}
           </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (game?.status === 'finished') {
+    const sortedTeams = [...teams].sort(
+      (a, b) => b.score - a.score
+    );
+
+    return (
+      <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+        <header className="text-center">
+          <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">
+            Monther&apos;s Class Battle
+          </p>
+
+          <h1 className="mt-3 text-5xl font-black">
+            Battle Finished!
+          </h1>
+
+          <p className="mt-4 text-lg text-slate-400">
+            Final Team Money
+          </p>
+        </header>
+
+        <section className="mt-10 grid gap-5">
+          {sortedTeams.map((team, index) => (
+            <div
+              key={team.id}
+              className={`flex flex-wrap items-center justify-between gap-4 rounded-3xl border-2 p-6 ${TEAM_COLOR_STYLES[team.color]}`}
+            >
+              <div className="flex items-center gap-5">
+                <span className="text-3xl font-black">
+                  #{index + 1}
+                </span>
+
+                <div>
+                  <h2 className="text-2xl font-black">
+                    {team.custom_name}
+                  </h2>
+
+                  <p className="mt-1 text-sm opacity-80">
+                    {team.color}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <p className="text-4xl font-black">
+                  {team.score}
+                </p>
+
+                <p className="text-sm font-bold">
+                  Money
+                </p>
+              </div>
+            </div>
+          ))}
         </section>
       </main>
     );
@@ -314,7 +614,7 @@ export default function TeacherGamePage() {
       </div>
 
       {error && (
-        <p className="mt-6 rounded-xl bg-red-500/20 p-4 text-red-200">
+        <p className="mt-6 rounded-xl bg-red-500/20 p-4 font-bold text-red-200">
           {error}
         </p>
       )}
@@ -359,7 +659,7 @@ export default function TeacherGamePage() {
               </div>
 
               <p className="mt-4 text-lg font-black">
-                Score: {team.score}
+                Money: {team.score}
               </p>
             </div>
           ))}
@@ -387,12 +687,13 @@ export default function TeacherGamePage() {
           )}
 
           <button
+            type="button"
             disabled={
               starting ||
               !teams.length ||
               game?.status !== 'lobby'
             }
-            onClick={start}
+            onClick={() => void start()}
             className="mt-6 w-full rounded-xl bg-cyan-400 px-4 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {starting ? 'Starting…' : 'Start Battle'}
@@ -444,7 +745,7 @@ export default function TeacherGamePage() {
             />
           </label>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-3">
             <label className="block text-sm font-bold">
               Question type
 
@@ -474,12 +775,28 @@ export default function TeacherGamePage() {
 
               <input
                 type="number"
-                min="1"
+                min="0"
                 value={points}
                 onChange={(event) =>
                   setPoints(event.target.value)
                 }
                 className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 p-3"
+              />
+            </label>
+
+            <label className="block text-sm font-bold">
+              Hidden Money
+
+              <input
+                type="number"
+                min="0"
+                required
+                value={money}
+                onChange={(event) =>
+                  setMoney(event.target.value)
+                }
+                placeholder="500"
+                className="mt-2 w-full rounded-xl border border-emerald-500/50 bg-slate-800 p-3 font-black text-emerald-300"
               />
             </label>
           </div>
@@ -537,9 +854,15 @@ export default function TeacherGamePage() {
                 key={question.id}
                 className="rounded-2xl border border-slate-700 bg-slate-800 p-5"
               >
-                <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
-                  Question {index + 1}
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs font-bold uppercase tracking-widest text-cyan-400">
+                    Question {index + 1}
+                  </p>
+
+                  <p className="text-sm font-black text-emerald-300">
+                    Hidden Money: {question.money}
+                  </p>
+                </div>
 
                 <p className="mt-2 text-lg font-bold">
                   {question.question_text}
@@ -568,7 +891,8 @@ function QRCode({ value }: { value: string }) {
           margin: 1,
         })
       )
-      .then(setSrc);
+      .then(setSrc)
+      .catch(() => setSrc(''));
   }, [value]);
 
   return src ? (
@@ -578,6 +902,6 @@ function QRCode({ value }: { value: string }) {
       className="mx-auto h-52 w-52"
     />
   ) : (
-    <div className="h-52 w-52 animate-pulse bg-slate-200" />
+    <div className="mx-auto h-52 w-52 animate-pulse bg-slate-200" />
   );
 }
