@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Game, Question } from '@/types';
+
+type Feedback = 'correct' | 'wrong' | null;
 
 export default function StudentGamePage() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -14,6 +16,9 @@ export default function StudentGamePage() {
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState('');
   const [selectedAnswer, setSelectedAnswer] = useState('');
+  const [feedback, setFeedback] = useState<Feedback>(null);
+
+  const answeredRef = useRef(false);
 
   useEffect(() => {
     const load = async () => {
@@ -68,6 +73,106 @@ export default function StudentGamePage() {
     };
   }, [gameId]);
 
+  const playCorrectSound = () => {
+    const AudioContextClass =
+      window.AudioContext ||
+      (
+        window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    const audio = new AudioContextClass();
+    const now = audio.currentTime;
+
+    const oscillator1 = audio.createOscillator();
+    const oscillator2 = audio.createOscillator();
+    const gain = audio.createGain();
+
+    oscillator1.type = 'triangle';
+    oscillator2.type = 'triangle';
+
+    oscillator1.frequency.setValueAtTime(523.25, now);
+    oscillator1.frequency.setValueAtTime(659.25, now + 0.12);
+
+    oscillator2.frequency.setValueAtTime(659.25, now);
+    oscillator2.frequency.setValueAtTime(783.99, now + 0.12);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.25, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+
+    oscillator1.connect(gain);
+    oscillator2.connect(gain);
+    gain.connect(audio.destination);
+
+    oscillator1.start(now);
+    oscillator2.start(now);
+
+    oscillator1.stop(now + 0.45);
+    oscillator2.stop(now + 0.45);
+
+    window.setTimeout(() => {
+      void audio.close();
+    }, 600);
+  };
+
+  const playWrongSound = () => {
+    const AudioContextClass =
+      window.AudioContext ||
+      (
+        window as typeof window & {
+          webkitAudioContext?: typeof AudioContext;
+        }
+      ).webkitAudioContext;
+
+    if (!AudioContextClass) return;
+
+    const audio = new AudioContextClass();
+    const now = audio.currentTime;
+
+    const oscillator = audio.createOscillator();
+    const gain = audio.createGain();
+
+    oscillator.type = 'sawtooth';
+    oscillator.frequency.setValueAtTime(180, now);
+    oscillator.frequency.exponentialRampToValueAtTime(70, now + 0.45);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+
+    oscillator.connect(gain);
+    gain.connect(audio.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.5);
+
+    window.setTimeout(() => {
+      void audio.close();
+    }, 650);
+  };
+
+  const answerQuestion = (answer: string) => {
+    if (!currentQuestion || answeredRef.current) return;
+
+    answeredRef.current = true;
+    setSelectedAnswer(answer);
+
+    const isCorrect =
+      answer.trim().toLowerCase() ===
+      currentQuestion.correct_answer.trim().toLowerCase();
+
+    if (isCorrect) {
+      setFeedback('correct');
+      playCorrectSound();
+    } else {
+      setFeedback('wrong');
+      playWrongSound();
+    }
+  };
+
   if (error) {
     return (
       <main className="p-10 text-center text-red-300">
@@ -116,11 +221,20 @@ export default function StudentGamePage() {
                   <button
                     key={option}
                     type="button"
-                    onClick={() => setSelectedAnswer(option)}
+                    disabled={answeredRef.current}
+                    onClick={() => answerQuestion(option)}
                     className={`rounded-2xl border-2 p-5 text-left text-lg font-bold transition ${
                       selectedAnswer === option
-                        ? 'border-cyan-400 bg-cyan-400/20'
+                        ? feedback === 'correct'
+                          ? 'border-emerald-400 bg-emerald-400/20'
+                          : feedback === 'wrong'
+                            ? 'border-red-400 bg-red-400/20'
+                            : 'border-cyan-400 bg-cyan-400/20'
                         : 'border-slate-700 bg-slate-800'
+                    } ${
+                      answeredRef.current
+                        ? 'cursor-not-allowed opacity-80'
+                        : 'hover:border-cyan-400'
                     }`}
                   >
                     <span className="mr-3 text-cyan-400">
@@ -135,22 +249,29 @@ export default function StudentGamePage() {
               <div className="mt-8">
                 <input
                   value={selectedAnswer}
+                  disabled={answeredRef.current}
                   onChange={(event) =>
                     setSelectedAnswer(event.target.value)
                   }
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      answerQuestion(selectedAnswer);
+                    }
+                  }}
                   placeholder="Type your answer..."
                   className="w-full rounded-xl border border-slate-600 bg-slate-800 p-4 text-lg"
                 />
+
+                <button
+                  type="button"
+                  disabled={!selectedAnswer || answeredRef.current}
+                  onClick={() => answerQuestion(selectedAnswer)}
+                  className="mt-4 w-full rounded-xl bg-cyan-400 px-5 py-4 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Check Answer
+                </button>
               </div>
             )}
-
-            <button
-              type="button"
-              disabled={!selectedAnswer}
-              className="mt-8 w-full rounded-xl bg-cyan-400 px-5 py-4 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              Submit Answer
-            </button>
           </section>
         ) : (
           <section className="mt-8 rounded-3xl border border-dashed border-slate-600 bg-slate-900 p-10 text-center">
@@ -181,6 +302,23 @@ export default function StudentGamePage() {
             Leave game
           </button>
         </section>
+      )}
+
+      {feedback && (
+        <div
+          className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          aria-live="assertive"
+        >
+          <div
+            className={`flex h-64 w-64 items-center justify-center rounded-full border-8 bg-slate-950 text-[180px] font-black leading-none shadow-2xl sm:h-80 sm:w-80 sm:text-[230px] ${
+              feedback === 'correct'
+                ? 'border-emerald-400 text-emerald-400'
+                : 'border-red-500 text-red-500'
+            }`}
+          >
+            {feedback === 'correct' ? '✓' : '✕'}
+          </div>
+        </div>
       )}
     </main>
   );
