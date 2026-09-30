@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import type { Game, Question } from '@/types';
@@ -39,7 +39,9 @@ export default function StudentGamePage() {
   const [selectedAnswer, setSelectedAnswer] = useState('');
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [sending, setSending] = useState(false);
-
+const audioContextRef = useRef<AudioContext | null>(null);
+const correctSoundRef = useRef<(() => void) | null>(null);
+const wrongSoundRef = useRef<(() => void) | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
 
