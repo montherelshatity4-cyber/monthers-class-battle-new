@@ -17,4 +17,4 @@ export interface Question {
   points: number;
   question_order: number;
   created_at: string;
-}
+} 
