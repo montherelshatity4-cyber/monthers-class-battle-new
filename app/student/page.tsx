@@ -4,12 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function StudentJoinPage() {
-  
   const router = useRouter();
-  useEffect(() => {
-  const pinFromUrl = new URLSearchParams(window.location.search).get('pin');
-  if (pinFromUrl) setPin(pinFromUrl);
-}, []);
+
   const [pin, setPin] = useState('');
   const [name, setName] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -17,108 +13,153 @@ export default function StudentJoinPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    const pinFromUrl = new URLSearchParams(window.location.search).get('pin');
+
+    if (pinFromUrl) {
+      setPin(pinFromUrl);
+    }
+  }, []);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+
     setLoading(true);
     setError('');
-    const response = await fetch('/api/games/join', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pin, displayName: name, teamName, color }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      setError(data.error);
-    } else {
+
+    try {
+      const response = await fetch('/api/games/join', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          pin,
+          displayName: name,
+          teamName,
+          color,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Unable to join the battle.');
+        setLoading(false);
+        return;
+      }
+
+      // Save both the player and the team on this device.
       localStorage.setItem(`player_${data.game.id}`, data.player.id);
+      localStorage.setItem(`team_${data.game.id}`, data.team.id);
+
       router.push(`/student/game/${data.game.id}`);
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg items-center px-6 py-10">
-      <form onSubmit={submit} className="w-full rounded-3xl border border-slate-700 bg-slate-900 p-7 shadow-2xl">
-        <p className="text-sm font-bold uppercase tracking-widest text-cyan-400">Join battle</p>
-        <h1 className="mt-2 text-3xl font-black">Choose your team</h1>
-        <p className="mt-2 text-slate-400">Team color and team name are required.</p>
+    <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-10">
+      <section className="w-full rounded-3xl border border-slate-700 bg-slate-900 p-6 shadow-2xl sm:p-8">
+        <div className="text-center">
+          <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-400">
+            Monther&apos;s Class Battle
+          </p>
 
-        {error && <p className="mt-5 rounded-xl bg-red-500/20 p-3 text-red-200">{error}</p>}
+          <h1 className="mt-4 text-4xl font-black">
+            Join the Battle
+          </h1>
 
-        <label className="mt-6 block text-sm font-bold">
-          Game PIN
-          <input
-            required
-            pattern="[0-9]{6}"
-            value={pin}
-            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 p-3 tracking-widest"
-          />
-        </label>
+          <p className="mt-3 text-slate-400">
+            Enter your team information to join.
+          </p>
+        </div>
 
-        <label className="mt-4 block text-sm font-bold">
-          Your name
-          <input
-            required
-            maxLength={40}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 p-3"
-          />
-        </label>
+        <form onSubmit={submit} className="mt-8 space-y-5">
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-300">
+              Game PIN
+            </label>
 
-        <label className="mt-4 block text-sm font-bold">
-          Team name
-          <input
-            required
-            maxLength={40}
-            value={teamName}
-            onChange={(e) => setTeamName(e.target.value)}
-            className="mt-2 w-full rounded-xl border border-slate-600 bg-slate-800 p-3"
-          />
-        </label>
-
-        <fieldset className="mt-5">
-          <legend className="text-sm font-bold">
-            Team color <span className="text-red-400">*</span>
-          </legend>
-          <div className="mt-2 grid grid-cols-2 gap-3">
-            {['RED', 'BLUE', 'GREEN', 'YELLOW'].map((option) => (
-              <label
-                key={option}
-                className={`cursor-pointer rounded-xl border-2 p-3 text-center font-black ${
-                  color === option ? 'border-white ring-2 ring-cyan-400' : 'border-slate-600'
-                } ${
-                  option === 'RED'
-                    ? 'bg-red-500'
-                    : option === 'BLUE'
-                      ? 'bg-blue-500'
-                      : option === 'GREEN'
-                        ? 'bg-emerald-500'
-                        : 'bg-yellow-400 text-slate-900'
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="color"
-                  value={option}
-                  checked={color === option}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="sr-only"
-                />
-                {option}
-              </label>
-            ))}
+            <input
+              value={pin}
+              onChange={(event) => setPin(event.target.value)}
+              inputMode="numeric"
+              maxLength={6}
+              required
+              placeholder="123456"
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 text-center text-xl font-black tracking-widest outline-none focus:border-cyan-400"
+            />
           </div>
-        </fieldset>
 
-        <button
-          disabled={loading}
-          className="mt-7 w-full rounded-xl bg-cyan-400 px-4 py-3 font-black text-slate-950 disabled:opacity-50"
-        >
-          {loading ? 'Joining…' : 'Join battle'}
-        </button>
-      </form>
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-300">
+              Your Name
+            </label>
+
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              placeholder="Enter your name"
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 outline-none focus:border-cyan-400"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-300">
+              Team Name
+            </label>
+
+            <input
+              value={teamName}
+              onChange={(event) => setTeamName(event.target.value)}
+              required
+              placeholder="Enter your team name"
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 outline-none focus:border-cyan-400"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-bold text-slate-300">
+              Team Color
+            </label>
+
+            <select
+              value={color}
+              onChange={(event) => setColor(event.target.value)}
+              required
+              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-4 outline-none focus:border-cyan-400"
+            >
+              <option value="">Choose a color</option>
+              <option value="RED">Red</option>
+              <option value="BLUE">Blue</option>
+              <option value="GREEN">Green</option>
+              <option value="YELLOW">Yellow</option>
+            </select>
+          </div>
+
+          {error && (
+            <div
+              className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-center text-sm font-bold text-red-300"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-cyan-400 px-5 py-4 text-lg font-black text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? 'Joining...' : 'Join Battle'}
+          </button>
+        </form>
+      </section>
     </main>
   );
 }
